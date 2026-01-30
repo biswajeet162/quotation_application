@@ -174,7 +174,7 @@ class _ProductsPageState extends State<ProductsPage> {
             ),
           ),
           const SizedBox(height: 8),
-          // Products List
+          // Products Table
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
@@ -207,56 +207,80 @@ class _ProductsPageState extends State<ProductsPage> {
                           ],
                         ),
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16.0),
-                        itemCount: _products.length,
-                        itemBuilder: (context, index) {
-                          final product = _products[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 2,
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SingleChildScrollView(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                            child: DataTable(
+                              headingRowColor: WidgetStateProperty.all(Colors.grey[100]),
+                              border: TableBorder.all(
+                                color: Colors.grey[300]!,
+                                width: 1,
                               ),
-                              title: Text(
-                                product.itemName,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
+                              columns: const [
+                                DataColumn(
+                                  label: Text(
+                                    'Item Number',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      const Text(
-                                        'Item Number: ',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
+                                DataColumn(
+                                  label: Text(
+                                    'Item Name',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Rate',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  numeric: true,
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'Description',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                DataColumn(
+                                  label: Text(
+                                    'HSN Code',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              rows: _products.map((product) {
+                                return DataRow(
+                                  cells: [
+                                    DataCell(
                                       Text(
                                         product.itemNumber,
-                                        style: TextStyle(
-                                          color: Colors.blue[700],
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Text(
-                                        'Rate: ',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
+                                    ),
+                                    DataCell(
+                                      Text(product.itemName),
+                                    ),
+                                    DataCell(
                                       Text(
                                         '₹${product.rate.toStringAsFixed(2)}',
                                         style: const TextStyle(
@@ -264,35 +288,26 @@ class _ProductsPageState extends State<ProductsPage> {
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Text(
-                                        'HSN Code: ',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w500,
+                                    ),
+                                    DataCell(
+                                      SizedBox(
+                                        width: 200,
+                                        child: Text(
+                                          product.description,
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 2,
                                         ),
                                       ),
+                                    ),
+                                    DataCell(
                                       Text(product.hsnCode),
-                                    ],
-                                  ),
-                                  if (product.description.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      product.description,
-                                      style: TextStyle(
-                                        color: Colors.grey[600],
-                                        fontSize: 13,
-                                      ),
                                     ),
                                   ],
-                                ],
-                              ),
+                                );
+                              }).toList(),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
           ),
         ],
