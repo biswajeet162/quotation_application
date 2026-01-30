@@ -70,7 +70,11 @@ class DatabaseHelper {
 
   Future<List<Product>> getAllProducts() async {
     final db = await database;
-    final result = await db.query('products', orderBy: 'itemNumber ASC');
+    // Sort by itemNumber numerically using CAST
+    final result = await db.query(
+      'products',
+      orderBy: 'CAST(itemNumber AS INTEGER) ASC',
+    );
     return result.map((map) => Product.fromMap(map)).toList();
   }
 

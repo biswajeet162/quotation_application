@@ -54,19 +54,22 @@ class _ProductsPageState extends State<ProductsPage> {
       int comparison = 0;
       switch (_sortColumn) {
         case 'itemNumber':
-          comparison = a.itemNumber.compareTo(b.itemNumber);
+          // Sort as integer
+          comparison = a.itemNumberAsInt.compareTo(b.itemNumberAsInt);
           break;
         case 'itemName':
           comparison = a.itemName.compareTo(b.itemName);
           break;
         case 'rate':
+          // Sort as number
           comparison = a.rate.compareTo(b.rate);
           break;
         case 'description':
           comparison = a.description.compareTo(b.description);
           break;
         case 'hsnCode':
-          comparison = a.hsnCode.compareTo(b.hsnCode);
+          // Sort as integer
+          comparison = a.hsnCodeAsInt.compareTo(b.hsnCodeAsInt);
           break;
       }
       return _sortAscending ? comparison : -comparison;

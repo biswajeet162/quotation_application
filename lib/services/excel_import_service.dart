@@ -42,13 +42,21 @@ class ExcelImportService {
           if (itemName == null || itemName.toString().isEmpty) continue;
 
           final rate = double.tryParse(rateStr.toString()) ?? 0.0;
+          
+          // Parse Item Number as integer (remove any non-numeric characters)
+          final itemNumberStr = itemNumber.toString().trim();
+          final itemNumberInt = int.tryParse(itemNumberStr.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+          
+          // Parse HSN Code as integer (remove any non-numeric characters)
+          final hsnCodeStr = hsnCode.toString().trim();
+          final hsnCodeInt = int.tryParse(hsnCodeStr.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
           products.add(Product(
-            itemNumber: itemNumber.toString(),
+            itemNumber: itemNumberInt.toString(),
             itemName: itemName.toString(),
             rate: rate,
             description: description.toString(),
-            hsnCode: hsnCode.toString(),
+            hsnCode: hsnCodeInt.toString(),
           ));
         } catch (e) {
           // Skip invalid rows
@@ -86,13 +94,21 @@ class ExcelImportService {
         if (itemName.isEmpty) continue;
 
         final rate = double.tryParse(rateStr.toString()) ?? 0.0;
+        
+        // Parse Item Number as integer (remove any non-numeric characters)
+        final itemNumberClean = itemNumber.trim();
+        final itemNumberInt = int.tryParse(itemNumberClean.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        
+        // Parse HSN Code as integer (remove any non-numeric characters)
+        final hsnCodeClean = hsnCode.trim();
+        final hsnCodeInt = int.tryParse(hsnCodeClean.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
         products.add(Product(
-          itemNumber: itemNumber,
+          itemNumber: itemNumberInt.toString(),
           itemName: itemName,
           rate: rate,
           description: description,
-          hsnCode: hsnCode,
+          hsnCode: hsnCodeInt.toString(),
         ));
       } catch (e) {
         // Skip invalid rows

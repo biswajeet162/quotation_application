@@ -15,6 +15,15 @@ class Product {
     required this.hsnCode,
   });
 
+  // Helper methods for numeric sorting
+  int get itemNumberAsInt {
+    return int.tryParse(itemNumber.trim().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  }
+
+  int get hsnCodeAsInt {
+    return int.tryParse(hsnCode.trim().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
