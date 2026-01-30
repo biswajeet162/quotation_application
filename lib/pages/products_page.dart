@@ -120,9 +120,9 @@ class _ProductsPageState extends State<ProductsPage> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header with Title and Import Button
+          // Title and Import Button
           Container(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.fromLTRB(24.0, 24.0, 24.0, 16.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -173,7 +173,7 @@ class _ProductsPageState extends State<ProductsPage> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           // Products Table
           Expanded(
             child: _isLoading
@@ -207,110 +207,176 @@ class _ProductsPageState extends State<ProductsPage> {
                           ],
                         ),
                       )
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SingleChildScrollView(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                            child: DataTable(
-                              headingRowColor: WidgetStateProperty.all(Colors.grey[100]),
-                              border: TableBorder.all(
-                                color: Colors.grey[300]!,
-                                width: 1,
-                              ),
-                              columns: const [
-                                DataColumn(
-                                  label: Text(
-                                    'Item Number',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Item Name',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Rate',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  numeric: true,
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'Description',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                                DataColumn(
-                                  label: Text(
-                                    'HSN Code',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              rows: _products.map((product) {
-                                return DataRow(
-                                  cells: [
-                                    DataCell(
-                                      Text(
-                                        product.itemNumber,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Text(product.itemName),
-                                    ),
-                                    DataCell(
-                                      Text(
-                                        '₹${product.rate.toStringAsFixed(2)}',
-                                        style: const TextStyle(
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      SizedBox(
-                                        width: 200,
-                                        child: Text(
-                                          product.description,
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 2,
-                                        ),
-                                      ),
-                                    ),
-                                    DataCell(
-                                      Text(product.hsnCode),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ),
+                    : _buildProductsTable(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProductsTable() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24.0),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          // Table Header
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+            ),
+            child: Table(
+              columnWidths: const {
+                0: FlexColumnWidth(1.2),
+                1: FlexColumnWidth(2.0),
+                2: FlexColumnWidth(1.0),
+                3: FlexColumnWidth(2.5),
+                4: FlexColumnWidth(1.0),
+              },
+              children: [
+                TableRow(
+                  children: [
+                    _buildHeaderCell('Item Number'),
+                    _buildHeaderCell('Item Name'),
+                    _buildHeaderCell('Rate'),
+                    _buildHeaderCell('Description'),
+                    _buildHeaderCell('HSN Code'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Table Body
+          Expanded(
+            child: ListView.builder(
+              itemCount: _products.length,
+              itemBuilder: (context, index) {
+                return _buildTableRow(_products[index], index);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderCell(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          color: Colors.black87,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTableRow(Product product, int index) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.grey[200]!),
+          ),
+        ),
+        child: _HoverableTableRow(
+          product: product,
+          isEven: index % 2 == 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _HoverableTableRow extends StatefulWidget {
+  final Product product;
+  final bool isEven;
+
+  const _HoverableTableRow({
+    required this.product,
+    required this.isEven,
+  });
+
+  @override
+  State<_HoverableTableRow> createState() => _HoverableTableRowState();
+}
+
+class _HoverableTableRowState extends State<_HoverableTableRow> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Container(
+        color: _isHovered
+            ? Colors.blue[50]
+            : widget.isEven
+                ? Colors.white
+                : Colors.grey[50],
+        child: Table(
+          columnWidths: const {
+            0: FlexColumnWidth(1.2),
+            1: FlexColumnWidth(2.0),
+            2: FlexColumnWidth(1.0),
+            3: FlexColumnWidth(2.5),
+            4: FlexColumnWidth(1.0),
+          },
+          children: [
+            TableRow(
+              children: [
+                _buildCell(
+                  widget.product.itemNumber,
+                  fontWeight: FontWeight.w500,
+                ),
+                _buildCell(widget.product.itemName),
+                _buildCell(
+                  '₹${widget.product.rate.toStringAsFixed(2)}',
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+                _buildCell(
+                  widget.product.description,
+                  maxLines: 2,
+                ),
+                _buildCell(widget.product.hsnCode),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCell(
+    String text, {
+    FontWeight? fontWeight,
+    Color? color,
+    int? maxLines,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: fontWeight ?? FontWeight.normal,
+          color: color ?? Colors.black87,
+        ),
+        maxLines: maxLines,
+        overflow: maxLines != null ? TextOverflow.ellipsis : null,
       ),
     );
   }
