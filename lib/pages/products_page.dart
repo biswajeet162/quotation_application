@@ -97,6 +97,66 @@ class _ProductsPageState extends State<ProductsPage> {
     });
   }
 
+  Future<void> _clearDatabase() async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Database'),
+        content: const Text(
+          'Are you sure you want to clear all products from the database? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        await _dbHelper.clearAllProducts();
+        await _loadProducts();
+        _searchController.clear();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Database cleared successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error clearing database: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _importExcel() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -173,20 +233,39 @@ class _ProductsPageState extends State<ProductsPage> {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Page Header with Import Button
+          // Page Header with Import and Clear DB Buttons
           PageHeader(
             title: 'Products',
-            actionButton: OutlinedButton.icon(
-              onPressed: _isLoading ? null : _importExcel,
-              icon: const Icon(Icons.upload_file, size: 20),
-              label: const Text('Import Excel'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
+            count: _filteredProducts.length,
+            actionButton: Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _clearDatabase,
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  label: const Text('Clear DB'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    side: BorderSide(color: Colors.red[300]!),
+                    foregroundColor: Colors.red[700],
+                  ),
                 ),
-                side: BorderSide(color: Colors.grey[300]!),
-              ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _isLoading ? null : _importExcel,
+                  icon: const Icon(Icons.upload_file, size: 20),
+                  label: const Text('Import Excel'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    side: BorderSide(color: Colors.grey[300]!),
+                  ),
+                ),
+              ],
             ),
           ),
           // Search Bar
