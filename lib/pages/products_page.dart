@@ -16,6 +16,8 @@ class _ProductsPageState extends State<ProductsPage> {
   final ExcelImportService _importService = ExcelImportService();
   List<Product> _products = [];
   bool _isLoading = false;
+  String _sortColumn = 'itemNumber';
+  bool _sortAscending = true;
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _ProductsPageState extends State<ProductsPage> {
       final products = await _dbHelper.getAllProducts();
       setState(() {
         _products = products;
+        _sortProducts();
         _isLoading = false;
       });
     } catch (e) {
@@ -44,6 +47,42 @@ class _ProductsPageState extends State<ProductsPage> {
         );
       }
     }
+  }
+
+  void _sortProducts() {
+    _products.sort((a, b) {
+      int comparison = 0;
+      switch (_sortColumn) {
+        case 'itemNumber':
+          comparison = a.itemNumber.compareTo(b.itemNumber);
+          break;
+        case 'itemName':
+          comparison = a.itemName.compareTo(b.itemName);
+          break;
+        case 'rate':
+          comparison = a.rate.compareTo(b.rate);
+          break;
+        case 'description':
+          comparison = a.description.compareTo(b.description);
+          break;
+        case 'hsnCode':
+          comparison = a.hsnCode.compareTo(b.hsnCode);
+          break;
+      }
+      return _sortAscending ? comparison : -comparison;
+    });
+  }
+
+  void _onSort(String column) {
+    setState(() {
+      if (_sortColumn == column) {
+        _sortAscending = !_sortAscending;
+      } else {
+        _sortColumn = column;
+        _sortAscending = true;
+      }
+      _sortProducts();
+    });
   }
 
   Future<void> _importExcel() async {
@@ -243,11 +282,11 @@ class _ProductsPageState extends State<ProductsPage> {
               children: [
                 TableRow(
                   children: [
-                    _buildHeaderCell('Item Number'),
-                    _buildHeaderCell('Item Name'),
-                    _buildHeaderCell('Rate'),
-                    _buildHeaderCell('Description'),
-                    _buildHeaderCell('HSN Code'),
+                    _buildHeaderCell('Item Number', 'itemNumber'),
+                    _buildHeaderCell('Item Name', 'itemName'),
+                    _buildHeaderCell('Rate', 'rate'),
+                    _buildHeaderCell('Description', 'description'),
+                    _buildHeaderCell('HSN Code', 'hsnCode'),
                   ],
                 ),
               ],
@@ -267,15 +306,38 @@ class _ProductsPageState extends State<ProductsPage> {
     );
   }
 
-  Widget _buildHeaderCell(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-          color: Colors.black87,
+  Widget _buildHeaderCell(String text, String columnKey) {
+    final isSorted = _sortColumn == columnKey;
+    return InkWell(
+      onTap: () => _onSort(columnKey),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (isSorted)
+              Icon(
+                _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+                size: 18,
+                color: Colors.blue[700],
+              )
+            else
+              Icon(
+                Icons.unfold_more,
+                size: 18,
+                color: Colors.grey[600],
+              ),
+          ],
         ),
       ),
     );
@@ -367,11 +429,11 @@ class _HoverableTableRowState extends State<_HoverableTableRow> {
     int? maxLines,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 14,
+          fontSize: 16,
           fontWeight: fontWeight ?? FontWeight.normal,
           color: color ?? Colors.black87,
         ),
