@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pages/products_page.dart';
-import 'widgets/navigation_drawer.dart';
+import 'widgets/navigation_sidebar.dart';
 
 void main() {
   runApp(const MyApp());
@@ -35,7 +35,10 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _pages = [
     const ProductsPage(),
-    // Add more pages here as needed
+    const PlaceholderPage(title: 'Dashboard'),
+    const PlaceholderPage(title: 'Make Quotation'),
+    const PlaceholderPage(title: 'Quotation History'),
+    const PlaceholderPage(title: 'Settings'),
   ];
 
   void _onItemSelected(int index) {
@@ -47,15 +50,40 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: AppNavigationDrawer(
-        selectedIndex: _selectedIndex,
-        onItemSelected: _onItemSelected,
+      body: Row(
+        children: [
+          NavigationSidebar(
+            selectedIndex: _selectedIndex,
+            onItemSelected: _onItemSelected,
+          ),
+          Expanded(
+            child: _pages[_selectedIndex],
+          ),
+        ],
       ),
-      appBar: AppBar(
-        title: const Text('Quotation Application'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+    );
+  }
+}
+
+class PlaceholderPage extends StatelessWidget {
+  final String title;
+
+  const PlaceholderPage({super.key, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+          ),
+        ),
       ),
-      body: _pages[_selectedIndex],
     );
   }
 }

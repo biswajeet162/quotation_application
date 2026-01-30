@@ -70,6 +70,9 @@ class _ProductsPageState extends State<ProductsPage> {
         }
 
         if (products.isNotEmpty) {
+          // Clear existing data before importing new data
+          await _dbHelper.clearAllProducts();
+          // Insert new products from Excel/CSV
           await _dbHelper.insertProductsBatch(products);
           await _loadProducts();
 
@@ -114,46 +117,63 @@ class _ProductsPageState extends State<ProductsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header with Import Button
+          // Header with Title and Import Button
           Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.2),
-                  spreadRadius: 1,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
+            padding: const EdgeInsets.all(24.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'Products',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
+                    color: Colors.black87,
                   ),
                 ),
-                ElevatedButton.icon(
+                OutlinedButton.icon(
                   onPressed: _isLoading ? null : _importExcel,
-                  icon: const Icon(Icons.upload_file),
+                  icon: const Icon(Icons.upload_file, size: 20),
                   label: const Text('Import Excel'),
-                  style: ElevatedButton.styleFrom(
+                  style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 12,
                     ),
+                    side: BorderSide(color: Colors.grey[300]!),
                   ),
                 ),
               ],
             ),
           ),
+          // Search Bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search by Item Name or HSN Code',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // Products List
           Expanded(
             child: _isLoading
