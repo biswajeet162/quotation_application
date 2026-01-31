@@ -59,13 +59,36 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     });
   }
 
-  void _removeItem(int index) {
-    setState(() {
-      _items.removeAt(index);
-      if (_items.isEmpty) {
-        _addNewItem();
-      }
-    });
+  Future<void> _removeItem(int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Item'),
+        content: const Text('Are you sure you want to delete this item?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        _items.removeAt(index);
+        if (_items.isEmpty) {
+          _addNewItem();
+        }
+      });
+    }
   }
 
   void _onProductSelected(int itemIndex, Product? product) {
@@ -385,6 +408,8 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       ),
       child: Row(
         children: [
+          _buildHeaderCell('S.No', 60),
+          const SizedBox(width: 12),
           _buildHeaderCell('Select Item', 200),
           const SizedBox(width: 12),
           _buildHeaderCell('HSN Code', 100),
@@ -438,6 +463,21 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       ),
       child: Row(
         children: [
+          _buildItemCell(
+            width: 60,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Text(
+                '${index + 1}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
           _buildItemCell(
             width: 200,
             child: _buildProductDropdown(index, item),
@@ -550,6 +590,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
               onPressed: () => _removeItem(index),
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
+              tooltip: 'Delete Item',
             ),
           ),
         ],
