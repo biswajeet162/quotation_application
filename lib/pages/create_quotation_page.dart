@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 import '../models/product.dart';
 import '../models/quotation_item.dart';
 import '../database/database_helper.dart';
-import '../widgets/page_header.dart';
 
 class CreateQuotationPage extends StatefulWidget {
   const CreateQuotationPage({super.key});
@@ -152,43 +151,54 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.grey[200],
       body: SingleChildScrollView(
         child: Container(
-          margin: const EdgeInsets.all(24.0),
-          padding: const EdgeInsets.all(24.0),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PageHeader(
-                title: 'Create Quotation',
-              ),
-              const SizedBox(height: 24),
-              // Customer Details Section
-              _buildCustomerDetailsSection(),
-              const SizedBox(height: 32),
-              // Item Details Section
-              _buildItemDetailsSection(),
-              const SizedBox(height: 24),
-              // Add Item Button
-              ElevatedButton.icon(
-                onPressed: _addNewItem,
-                icon: const Icon(Icons.add),
-                label: const Text('Add Item'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+          margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
+          child: Card(
+            elevation: 2,
+            color: Colors.grey[50],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  const Text(
+                    'Create Quotation',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  // Customer Details Section
+                  _buildCustomerDetailsSection(),
+                  const SizedBox(height: 24),
+                  // Item Details Section
+                  _buildItemDetailsSection(),
+                  const SizedBox(height: 20),
+                  // Add Item Button
+                  ElevatedButton.icon(
+                    onPressed: _addNewItem,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Item'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -310,8 +320,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
               vertical: 12,
             ),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey),
+              border: Border.all(color: Colors.grey[400]!),
               borderRadius: BorderRadius.circular(4),
+              color: Colors.white,
             ),
             child: Row(
               children: [
@@ -324,10 +335,11 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       color: _selectedDate != null
                           ? Colors.black87
                           : Colors.grey[600],
+                      fontSize: 14,
                     ),
                   ),
                 ),
-                Icon(Icons.calendar_today, size: 20, color: Colors.grey[600]),
+                Icon(Icons.calendar_today, size: 20, color: Colors.grey[700]),
               ],
             ),
           ),
@@ -560,7 +572,18 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       decoration: InputDecoration(
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: Colors.grey[400]!),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: Colors.grey[400]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: Colors.blue[700]!, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 10,
@@ -568,21 +591,70 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         isDense: true,
       ),
       hint: const Text(
-        'Items',
+        'Select Item',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 14),
+        style: TextStyle(fontSize: 14, color: Colors.grey),
       ),
       isExpanded: true,
-      style: const TextStyle(fontSize: 14),
+      style: const TextStyle(
+        fontSize: 14,
+        color: Colors.black87,
+      ),
       alignment: Alignment.center,
+      dropdownColor: Colors.white,
+      menuMaxHeight: 400,
+      icon: const Icon(Icons.arrow_drop_down, color: Colors.black87),
+      selectedItemBuilder: (BuildContext context) {
+        // Show only item name when selected
+        return _products.map((product) {
+          return Align(
+            alignment: Alignment.center,
+            child: Text(
+              product.itemName,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
+        }).toList();
+      },
       items: _products.map((product) {
         return DropdownMenuItem<Product>(
           value: product,
-          child: Text(
-            product.itemName,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        product.itemName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'HSN: ${product.hsnCode} | Rate: ₹${product.rate.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }).toList(),
@@ -598,11 +670,22 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       controller: TextEditingController(text: value),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       textAlign: TextAlign.center,
-      style: const TextStyle(fontSize: 14),
+      style: const TextStyle(fontSize: 14, color: Colors.black87),
       decoration: InputDecoration(
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: Colors.grey[400]!),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: Colors.grey[400]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: Colors.blue[700]!, width: 2),
+        ),
+        filled: true,
+        fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
           vertical: 10,
@@ -622,16 +705,18 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           vertical: 10,
         ),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
+          border: Border.all(color: Colors.grey[400]!),
           borderRadius: BorderRadius.circular(4),
+          color: Colors.white,
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Expanded(
               child: Text(
                 item.deliveryDate != null
                     ? DateFormat('dd-MM-yyyy').format(item.deliveryDate!)
-                    : '',
+                    : 'Select Date',
                 style: TextStyle(
                   color: item.deliveryDate != null
                       ? Colors.black87
@@ -642,7 +727,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+            Icon(Icons.calendar_today, size: 16, color: Colors.grey[700]),
           ],
         ),
       ),
