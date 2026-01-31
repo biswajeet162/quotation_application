@@ -944,11 +944,11 @@ class _QuotationPreviewDialog extends StatelessWidget {
       // Create PDF document
       final pdf = pw.Document();
       
-      // A4 page size: 210mm x 297mm
+      // Match the preview modal layout - use a wider format
       pdf.addPage(
         pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(40),
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(30),
           build: (pw.Context context) {
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -1005,23 +1005,23 @@ class _QuotationPreviewDialog extends StatelessWidget {
                                     pw.Text(
                                       'Ashoka Bearing Enterprises',
                                       style: pw.TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 18,
                                         fontWeight: pw.FontWeight.bold,
                                       ),
                                     ),
                                     pw.SizedBox(height: 4),
                                     pw.Text(
                                       '2, Ring Rd, Awas Vikas, Rudrapur, Jagatpura, Uttarakhand 263153',
-                                      style: const pw.TextStyle(fontSize: 11),
+                                      style: const pw.TextStyle(fontSize: 12),
                                     ),
                                     pw.SizedBox(height: 4),
                                     pw.Text(
                                       'GSTIN No.: XXXXXXX XXXXXXXX',
-                                      style: const pw.TextStyle(fontSize: 11),
+                                      style: const pw.TextStyle(fontSize: 12),
                                     ),
                                     pw.Text(
                                       'PAN No.: XXXXX XXXXXX',
-                                      style: const pw.TextStyle(fontSize: 11),
+                                      style: const pw.TextStyle(fontSize: 12),
                                     ),
                                   ],
                                 ),
@@ -1047,26 +1047,26 @@ class _QuotationPreviewDialog extends StatelessWidget {
                             pw.Text(
                               'Customer Details',
                               style: pw.TextStyle(
-                                fontSize: 12,
+                                fontSize: 14,
                                 fontWeight: pw.FontWeight.bold,
                               ),
                             ),
-                            pw.SizedBox(height: 6),
+                            pw.SizedBox(height: 8),
                             pw.Text(
                               customerName.isEmpty ? 'Customer Name' : customerName,
-                              style: const pw.TextStyle(fontSize: 11),
+                              style: const pw.TextStyle(fontSize: 12),
                             ),
                             pw.SizedBox(height: 4),
                             pw.Text(
                               customerAddress.isEmpty ? 'Address' : customerAddress,
-                              style: const pw.TextStyle(fontSize: 11),
+                              style: const pw.TextStyle(fontSize: 12),
                             ),
                             pw.SizedBox(height: 4),
                             pw.Text(
                               customerContact.isEmpty
                                   ? 'Contact.: XXXXXXX XXXXXXXX'
                                   : 'Contact.: $customerContact',
-                              style: const pw.TextStyle(fontSize: 11),
+                              style: const pw.TextStyle(fontSize: 12),
                             ),
                           ],
                         ),
@@ -1082,14 +1082,14 @@ class _QuotationPreviewDialog extends StatelessWidget {
                     pw.Text(
                       'Quotation Number: $quotationNumber',
                       style: pw.TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: pw.FontWeight.bold,
                       ),
                     ),
                     pw.Text(
                       'Quotation Date: ${DateFormat('dd-MM-yyyy').format(quotationDate)}',
                       style: pw.TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: pw.FontWeight.bold,
                       ),
                     ),
@@ -1203,19 +1203,19 @@ class _QuotationPreviewDialog extends StatelessWidget {
                     pw.Text(
                       'T&Cs:',
                       style: pw.TextStyle(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: pw.FontWeight.bold,
                       ),
                     ),
                     pw.SizedBox(height: 6),
                     pw.Text(
                       'Taxes amounting 18% of the total value will be included in the invoice',
-                      style: const pw.TextStyle(fontSize: 11),
+                      style: const pw.TextStyle(fontSize: 12),
                     ),
                     pw.SizedBox(height: 4),
                     pw.Text(
                       'Lorem Ipsum Doler Sit Amet',
-                      style: const pw.TextStyle(fontSize: 11),
+                      style: const pw.TextStyle(fontSize: 12),
                     ),
                   ],
                 ),
@@ -1279,11 +1279,11 @@ class _QuotationPreviewDialog extends StatelessWidget {
 
   pw.Widget _buildPdfCell(String text, {bool isHeader = false, pw.FontWeight? fontWeight}) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.all(4),
+      padding: const pw.EdgeInsets.all(6),
       child: pw.Text(
         text,
         style: pw.TextStyle(
-          fontSize: isHeader ? 9 : 8,
+          fontSize: isHeader ? 10 : 9,
           fontWeight: fontWeight ?? (isHeader ? pw.FontWeight.bold : pw.FontWeight.normal),
         ),
         textAlign: pw.TextAlign.center,
