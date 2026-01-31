@@ -38,7 +38,10 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   }
 
   void _onDataChanged() {
-    widget.onDataChanged?.call(_hasData());
+    // Schedule callback after the current build phase to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onDataChanged?.call(_hasData());
+    });
   }
 
   @override
@@ -66,6 +69,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       newItem.deliveryDate = DateTime.now();
       newItem.calculateValues();
       _items.add(newItem);
+    });
+    // Schedule callback after the current build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onDataChanged?.call(_hasData());
     });
   }
@@ -98,6 +104,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           if (_items.isEmpty) {
             _addNewItem();
           }
+        });
+        // Schedule callback after the current build phase
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           widget.onDataChanged?.call(_hasData());
         });
       }
@@ -130,6 +139,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         item.qty = 0;
         item.calculateValues();
       }
+    });
+    // Schedule callback after the current build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onDataChanged?.call(_hasData());
     });
   }
@@ -152,6 +164,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           break;
       }
       item.calculateValues();
+    });
+    // Schedule callback after the current build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onDataChanged?.call(_hasData());
     });
   }
@@ -166,6 +181,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
+      });
+      // Schedule callback after the current build phase
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.onDataChanged?.call(_hasData());
       });
     }
@@ -181,17 +199,40 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     if (picked != null) {
       setState(() {
         _items[itemIndex].deliveryDate = picked;
+      });
+      // Schedule callback after the current build phase
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         widget.onDataChanged?.call(_hasData());
       });
     }
   }
 
-  void _generateQuotation() {
-    // TODO: Implement quotation generation
+  void _previewQuotation() {
+    // TODO: Implement quotation preview
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Quotation generation will be implemented'),
+        content: Text('Preview functionality will be implemented'),
         backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  void _downloadQuotation() {
+    // TODO: Implement quotation download
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Download functionality will be implemented'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _emailQuotation() {
+    // TODO: Implement quotation email
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Email functionality will be implemented'),
+        backgroundColor: Colors.orange,
       ),
     );
   }
@@ -244,20 +285,79 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  // Action Buttons (Preview, Download, Email)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: _previewQuotation,
+                        icon: const Icon(Icons.preview, color: Colors.white),
+                        label: const Text(
+                          'Preview',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: _downloadQuotation,
+                        icon: const Icon(Icons.download, color: Colors.white),
+                        label: const Text(
+                          'Download',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: _emailQuotation,
+                        icon: const Icon(Icons.email, color: Colors.white),
+                        label: const Text(
+                          'Email',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
-        ),
-      ),
-      // Generate Button (Fixed at bottom right)
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _generateQuotation,
-        backgroundColor: Colors.green,
-        icon: const Icon(Icons.description, color: Colors.white),
-        label: const Text(
-          'Generate',
-          style: TextStyle(color: Colors.white),
         ),
       ),
     );
