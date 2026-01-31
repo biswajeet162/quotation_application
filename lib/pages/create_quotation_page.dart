@@ -207,32 +207,59 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     }
   }
 
+  String _generateQuotationNumber() {
+    // Generate quotation number based on current date/time
+    final now = DateTime.now();
+    return '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+  }
+
   void _previewQuotation() {
-    // TODO: Implement quotation preview
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Preview functionality will be implemented'),
-        backgroundColor: Colors.blue,
+    // Check if there's at least one item with a product selected
+    final validItems = _items.where((item) => item.product != null).toList();
+    if (validItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one item to preview'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Container(
+              width: constraints.maxWidth * 0.95,
+              height: constraints.maxHeight * 0.95,
+              constraints: BoxConstraints(
+                maxWidth: 1200,
+                maxHeight: constraints.maxHeight * 0.95,
+              ),
+              child: _QuotationPreviewDialog(
+                quotationNumber: _generateQuotationNumber(),
+                quotationDate: _selectedDate ?? DateTime.now(),
+                customerName: _customerNameController.text,
+                customerAddress: _addressController.text,
+                customerContact: _mobileController.text,
+                items: validItems,
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  void _downloadQuotation() {
-    // TODO: Implement quotation download
+  void _saveQuotation() {
+    // TODO: Implement quotation save
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Download functionality will be implemented'),
+        content: Text('Save functionality will be implemented'),
         backgroundColor: Colors.green,
-      ),
-    );
-  }
-
-  void _emailQuotation() {
-    // TODO: Implement quotation email
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email functionality will be implemented'),
-        backgroundColor: Colors.orange,
       ),
     );
   }
@@ -286,7 +313,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Action Buttons (Preview, Download, Email)
+                  // Action Buttons (Preview, Save)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
@@ -312,10 +339,10 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       ),
                       const SizedBox(width: 12),
                       ElevatedButton.icon(
-                        onPressed: _downloadQuotation,
-                        icon: const Icon(Icons.download, color: Colors.white),
+                        onPressed: _saveQuotation,
+                        icon: const Icon(Icons.save, color: Colors.white),
                         label: const Text(
-                          'Download',
+                          'Save',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -324,27 +351,6 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: _emailQuotation,
-                        icon: const Icon(Icons.email, color: Colors.white),
-                        label: const Text(
-                          'Email',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
@@ -897,6 +903,487 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _QuotationPreviewDialog extends StatelessWidget {
+  final String quotationNumber;
+  final DateTime quotationDate;
+  final String customerName;
+  final String customerAddress;
+  final String customerContact;
+  final List<QuotationItem> items;
+
+  const _QuotationPreviewDialog({
+    required this.quotationNumber,
+    required this.quotationDate,
+    required this.customerName,
+    required this.customerAddress,
+    required this.customerContact,
+    required this.items,
+  });
+
+  void _downloadQuotation(BuildContext context) {
+    // TODO: Implement quotation download
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Download functionality will be implemented'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _emailQuotation(BuildContext context) {
+    // TODO: Implement quotation email
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Email functionality will be implemented'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Calculate totals
+    double totalAmount = 0;
+    double totalGstAmount = 0;
+    double grandTotal = 0;
+    for (var item in items) {
+      totalAmount += item.unitPrice;
+      totalGstAmount += item.gstAmount;
+      grandTotal += item.lineTotal;
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Quotation Preview'),
+        backgroundColor: Colors.blue[700],
+        foregroundColor: Colors.white,
+        actions: [
+          ElevatedButton.icon(
+            onPressed: () => _downloadQuotation(context),
+            icon: const Icon(Icons.download, color: Colors.white, size: 18),
+            label: const Text(
+              'Download',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            onPressed: () => _emailQuotation(context),
+            icon: const Icon(Icons.email, color: Colors.white, size: 18),
+            label: const Text(
+              'Email',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight - 100,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header Section
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Company Details (Left)
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Company Logo
+                            Row(
+                              children: [
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[700],
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'ABE',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          'GROUP',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Flexible(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Ashoka Bearing Enterprises',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        '2, Ring Rd, Awas Vikas, Rudrapur, Jagatpura, Uttarakhand 263153',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'GSTIN No.: XXXXXXX XXXXXXXX',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      Text(
+                                        'PAN No.: XXXXX XXXXXX',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // Customer Details (Right)
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Customer Details',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                customerName.isEmpty ? 'Customer Name' : customerName,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                customerAddress.isEmpty ? 'Address' : customerAddress,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                customerContact.isEmpty
+                                    ? 'Contact.: XXXXXXX XXXXXXXX'
+                                    : 'Contact.: $customerContact',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Quotation Number and Date
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Quotation Number: $quotationNumber',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Flexible(
+                        child: Text(
+                          'Quotation Date: ${DateFormat('dd-MM-yyyy').format(quotationDate)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+            // Item Details Table
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Column(
+                  children: [
+                    // Table Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          _buildHeaderCell('S.No.', 50),
+                          _buildHeaderCell('Item Description', 200),
+                          _buildHeaderCell('HSN Code', 100),
+                          _buildHeaderCell('Qty', 60),
+                          _buildHeaderCell('RSP(INR)', 100),
+                          _buildHeaderCell('Disc%', 70),
+                          _buildHeaderCell('Unit Price', 100),
+                          _buildHeaderCell('Total', 100),
+                          _buildHeaderCell('GST %', 70),
+                          _buildHeaderCell('GST Amount', 100),
+                          _buildHeaderCell('Line Total', 100),
+                          _buildHeaderCell('Delivery Date', 120),
+                        ],
+                      ),
+                    ),
+                    // Table Rows
+                    ...items.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: Colors.grey[200]!),
+                          ),
+                          color: index % 2 == 0 ? Colors.white : Colors.grey[50],
+                        ),
+                        child: Row(
+                          children: [
+                            _buildDataCell('${index + 1}', 50),
+                            _buildDataCell(
+                              item.product?.itemName ?? '',
+                              200,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            _buildDataCell(item.hsnCode, 100),
+                            _buildDataCell(item.qty.toStringAsFixed(0), 60),
+                            _buildDataCell(
+                              '₹${item.rsp.toStringAsFixed(2)}',
+                              100,
+                            ),
+                            _buildDataCell(
+                              '${item.discPercent.toStringAsFixed(0)}%',
+                              70,
+                            ),
+                            _buildDataCell(
+                              '₹${item.unitPrice.toStringAsFixed(2)}',
+                              100,
+                            ),
+                            _buildDataCell(
+                              '₹${item.total.toStringAsFixed(2)}',
+                              100,
+                            ),
+                            _buildDataCell(
+                              '${item.gstPercent.toStringAsFixed(0)}%',
+                              70,
+                            ),
+                            _buildDataCell(
+                              '₹${item.gstAmount.toStringAsFixed(2)}',
+                              100,
+                            ),
+                            _buildDataCell(
+                              '₹${item.lineTotal.toStringAsFixed(2)}',
+                              100,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            _buildDataCell(
+                              item.deliveryDate != null
+                                  ? DateFormat('dd-MM-yyyy').format(item.deliveryDate!)
+                                  : '',
+                              120,
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ),
+                  const SizedBox(height: 16),
+                  // Totals Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey[300]!),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            _buildTotalRow('Subtotal:', '₹${totalAmount.toStringAsFixed(2)}'),
+                            const SizedBox(height: 6),
+                            _buildTotalRow('GST Amount:', '₹${totalGstAmount.toStringAsFixed(2)}'),
+                            const SizedBox(height: 6),
+                            _buildTotalRow(
+                              'Grand Total:',
+                              '₹${grandTotal.toStringAsFixed(2)}',
+                              isBold: true,
+                              fontSize: 14,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Terms & Conditions
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'T&Cs:',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 6),
+                      Text(
+                        'Taxes amounting 18% of the total value will be included in the invoice',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Lorem Ipsum Doler Sit Amet',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHeaderCell(String text, double width) {
+    return SizedBox(
+      width: width,
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildDataCell(String text, double width, {FontWeight? fontWeight}) {
+    return SizedBox(
+      width: width,
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: fontWeight ?? FontWeight.normal,
+        ),
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildTotalRow(String label, String value, {bool isBold = false, double fontSize = 14}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
     );
   }
 }
