@@ -25,8 +25,17 @@ class DatabaseHelper {
   Future<Database> _initDB(String filePath) async {
     String dbPath;
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      final directory = await getApplicationDocumentsDirectory();
-      dbPath = join(directory.path, filePath);
+      // Get the executable's directory
+      final executablePath = Platform.resolvedExecutable;
+      final executableDir = dirname(executablePath);
+      
+      // Create 'db' folder if it doesn't exist
+      final dbDirectory = Directory(join(executableDir, 'db'));
+      if (!await dbDirectory.exists()) {
+        await dbDirectory.create(recursive: true);
+      }
+      
+      dbPath = join(dbDirectory.path, filePath);
     } else {
       dbPath = join(await getDatabasesPath(), filePath);
     }
