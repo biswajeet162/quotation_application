@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pages/products_page.dart';
+import 'pages/create_quotation_page.dart';
 import 'widgets/navigation_sidebar.dart';
 
 void main() {
@@ -36,7 +37,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _pages = [
     const ProductsPage(),
     const PlaceholderPage(title: 'Dashboard'),
-    const PlaceholderPage(title: 'Make Quotation'),
+    const CreateQuotationPage(),
     const PlaceholderPage(title: 'Quotation History'),
     const PlaceholderPage(title: 'Settings'),
   ];
