@@ -33,6 +33,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  bool _hasQuotationData = false;
 
   final List<Widget> _pages = [
     const ProductsPage(),
@@ -42,7 +43,43 @@ class _MainScreenState extends State<MainScreen> {
     const PlaceholderPage(title: 'Settings'),
   ];
 
-  void _onItemSelected(int index) {
+  void _updateQuotationDataStatus(bool hasData) {
+    setState(() {
+      _hasQuotationData = hasData;
+    });
+  }
+
+  Future<void> _onItemSelected(int index) async {
+    // If trying to navigate away from Create Quotation page and there's data
+    if (_selectedIndex == 2 && index != 2 && _hasQuotationData) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Unsaved Changes'),
+          content: const Text(
+            'You have unsaved quotation data. All data will be erased if you navigate away. Do you want to continue?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) {
+        return; // Don't navigate if user cancelled
+      }
+    }
+
     setState(() {
       _selectedIndex = index;
     });
@@ -58,7 +95,11 @@ class _MainScreenState extends State<MainScreen> {
             onItemSelected: _onItemSelected,
           ),
           Expanded(
-            child: _pages[_selectedIndex],
+            child: _selectedIndex == 2
+                ? CreateQuotationPage(
+                    onDataChanged: _updateQuotationDataStatus,
+                  )
+                : _pages[_selectedIndex],
           ),
         ],
       ),

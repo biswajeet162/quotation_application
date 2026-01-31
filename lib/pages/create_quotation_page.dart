@@ -5,7 +5,9 @@ import '../models/quotation_item.dart';
 import '../database/database_helper.dart';
 
 class CreateQuotationPage extends StatefulWidget {
-  const CreateQuotationPage({super.key});
+  final Function(bool)? onDataChanged;
+
+  const CreateQuotationPage({super.key, this.onDataChanged});
 
   @override
   State<CreateQuotationPage> createState() => _CreateQuotationPageState();
@@ -29,6 +31,14 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     super.initState();
     _loadProducts();
     _addNewItem();
+    // Add listeners to text controllers
+    _customerNameController.addListener(_onDataChanged);
+    _addressController.addListener(_onDataChanged);
+    _mobileController.addListener(_onDataChanged);
+  }
+
+  void _onDataChanged() {
+    widget.onDataChanged?.call(_hasData());
   }
 
   @override
@@ -56,6 +66,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       newItem.deliveryDate = DateTime.now();
       newItem.calculateValues();
       _items.add(newItem);
+      widget.onDataChanged?.call(_hasData());
     });
   }
 
@@ -81,14 +92,24 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       ),
     );
 
-    if (confirmed == true) {
-      setState(() {
-        _items.removeAt(index);
-        if (_items.isEmpty) {
-          _addNewItem();
-        }
-      });
-    }
+      if (confirmed == true) {
+        setState(() {
+          _items.removeAt(index);
+          if (_items.isEmpty) {
+            _addNewItem();
+          }
+          widget.onDataChanged?.call(_hasData());
+        });
+      }
+  }
+
+  bool _hasData() {
+    // Check if at least one item has a product selected
+    return _items.any((item) => item.product != null) ||
+        _customerNameController.text.isNotEmpty ||
+        _addressController.text.isNotEmpty ||
+        _mobileController.text.isNotEmpty ||
+        _selectedDate != null;
   }
 
   void _onProductSelected(int itemIndex, Product? product) {
@@ -109,6 +130,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         item.qty = 0;
         item.calculateValues();
       }
+      widget.onDataChanged?.call(_hasData());
     });
   }
 
@@ -130,6 +152,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           break;
       }
       item.calculateValues();
+      widget.onDataChanged?.call(_hasData());
     });
   }
 
@@ -143,6 +166,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
+        widget.onDataChanged?.call(_hasData());
       });
     }
   }
@@ -157,6 +181,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     if (picked != null) {
       setState(() {
         _items[itemIndex].deliveryDate = picked;
+        widget.onDataChanged?.call(_hasData());
       });
     }
   }
