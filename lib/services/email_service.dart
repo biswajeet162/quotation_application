@@ -94,7 +94,7 @@ class EmailService {
     }
   }
 
-  /// Builds the email body text
+  /// Builds the email body with formatted plain text table
   static String _buildEmailBody({
     required String quotationNumber,
     required DateTime quotationDate,
@@ -107,64 +107,155 @@ class EmailService {
     required double grandTotal,
   }) {
     final buffer = StringBuffer();
+    
+    // Header
+    buffer.writeln('═══════════════════════════════════════════════════════════════════════════════');
+    buffer.writeln('                    QUOTATION #$quotationNumber');
+    buffer.writeln('                 Ashoka Bearing Enterprises');
+    buffer.writeln('═══════════════════════════════════════════════════════════════════════════════');
+    buffer.writeln('');
+    
+    // Greeting
     buffer.writeln('Dear ${customerName.isEmpty ? "Customer" : customerName},');
     buffer.writeln('');
     buffer.writeln('Please find below the quotation details:');
     buffer.writeln('');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Quotation Details
     buffer.writeln('QUOTATION DETAILS');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('');
+    buffer.writeln('─────────────────────────────────────────────────────────────────────────────────');
     buffer.writeln('Quotation Number: $quotationNumber');
     buffer.writeln('Quotation Date: ${DateFormat('dd-MM-yyyy').format(quotationDate)}');
     buffer.writeln('');
     buffer.writeln('Customer Details:');
-    buffer.writeln('  Name: ${customerName.isEmpty ? "Customer Name" : customerName}');
+    buffer.writeln('  Name:    ${customerName.isEmpty ? "Customer Name" : customerName}');
     buffer.writeln('  Address: ${customerAddress.isEmpty ? "Address" : customerAddress}');
     buffer.writeln('  Contact: ${customerContact.isEmpty ? "Contact Number" : customerContact}');
     buffer.writeln('');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('ITEM DETAILS');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('');
-    buffer.writeln('S.No. | Item Description | HSN Code | Qty | RSP(INR) | Disc% | Unit Price | Total | GST % | GST Amount | Line Total | Delivery Date');
-    buffer.writeln('-' * 120);
     
+    // Item Details Table
+    buffer.writeln('ITEM DETAILS');
+    buffer.writeln('─────────────────────────────────────────────────────────────────────────────────');
+    buffer.writeln('');
+    
+    // Define column widths
+    final colWidths = {
+      'sno': 5,
+      'item': 20,
+      'hsn': 10,
+      'qty': 6,
+      'rsp': 12,
+      'disc': 7,
+      'unitPrice': 12,
+      'total': 12,
+      'gstPercent': 7,
+      'gstAmount': 12,
+      'lineTotal': 12,
+      'deliveryDate': 12,
+    };
+    
+    // Table Header
+    final headerLine = _buildTableRow(
+      ['S.No.', 'Item Description', 'HSN Code', 'Qty', 'RSP(INR)', 'Disc%', 'Unit Price', 'Total', 'GST%', 'GST Amt', 'Line Total', 'Del. Date'],
+      colWidths,
+      isHeader: true,
+    );
+    buffer.writeln(headerLine);
+    buffer.writeln('─' * headerLine.length);
+    
+    // Table Rows
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
-      buffer.writeln(
-        '${i + 1} | ${item.product?.itemName ?? ""} | ${item.hsnCode} | ${item.qty.toStringAsFixed(0)} | '
-        'Rs.${item.rsp.toStringAsFixed(2)} | ${item.discPercent.toStringAsFixed(0)}% | '
-        'Rs.${item.unitPrice.toStringAsFixed(2)} | Rs.${item.total.toStringAsFixed(2)} | '
-        '${item.gstPercent.toStringAsFixed(0)}% | Rs.${item.gstAmount.toStringAsFixed(2)} | '
-        'Rs.${item.lineTotal.toStringAsFixed(2)} | '
-        '${item.deliveryDate != null ? DateFormat('dd-MM-yyyy').format(item.deliveryDate!) : ""}'
+      final row = _buildTableRow(
+        [
+          '${i + 1}',
+          item.product?.itemName ?? '',
+          item.hsnCode,
+          item.qty.toStringAsFixed(0),
+          '₹${item.rsp.toStringAsFixed(2)}',
+          '${item.discPercent.toStringAsFixed(0)}%',
+          '₹${item.unitPrice.toStringAsFixed(2)}',
+          '₹${item.total.toStringAsFixed(2)}',
+          '${item.gstPercent.toStringAsFixed(0)}%',
+          '₹${item.gstAmount.toStringAsFixed(2)}',
+          '₹${item.lineTotal.toStringAsFixed(2)}',
+          item.deliveryDate != null ? DateFormat('dd-MM-yyyy').format(item.deliveryDate!) : '',
+        ],
+        colWidths,
       );
+      buffer.writeln(row);
     }
     
     buffer.writeln('');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('─────────────────────────────────────────────────────────────────────────────────');
+    buffer.writeln('');
+    
+    // Totals Section
     buffer.writeln('TOTALS');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('─────────────────────────────────────────────────────────────────────────────────');
+    final totalsWidth = 50;
+    buffer.writeln('Subtotal:'.padLeft(totalsWidth - 15) + '₹${totalAmount.toStringAsFixed(2)}'.padLeft(15));
+    buffer.writeln('GST Amount:'.padLeft(totalsWidth - 15) + '₹${totalGstAmount.toStringAsFixed(2)}'.padLeft(15));
+    buffer.writeln('GRAND TOTAL:'.padLeft(totalsWidth - 15) + '₹${grandTotal.toStringAsFixed(2)}'.padLeft(15));
     buffer.writeln('');
-    buffer.writeln('Subtotal:     Rs.${totalAmount.toStringAsFixed(2)}');
-    buffer.writeln('GST Amount:   Rs.${totalGstAmount.toStringAsFixed(2)}');
-    buffer.writeln('Grand Total:  Rs.${grandTotal.toStringAsFixed(2)}');
-    buffer.writeln('');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Terms & Conditions
     buffer.writeln('TERMS & CONDITIONS');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    buffer.writeln('');
+    buffer.writeln('─────────────────────────────────────────────────────────────────────────────────');
     buffer.writeln('Taxes amounting 18% of the total value will be included in the invoice');
     buffer.writeln('Lorem Ipsum Doler Sit Amet');
     buffer.writeln('');
-    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // Footer
+    buffer.writeln('─────────────────────────────────────────────────────────────────────────────────');
     buffer.writeln('');
     buffer.writeln('Please find the detailed quotation attached as PDF.');
     buffer.writeln('');
     buffer.writeln('Best Regards,');
     buffer.writeln('Ashoka Bearing Enterprises');
     buffer.writeln('2, Ring Rd, Awas Vikas, Rudrapur, Jagatpura, Uttarakhand 263153');
+    
+    return buffer.toString();
+  }
+  
+  /// Builds a formatted table row with proper spacing
+  static String _buildTableRow(
+    List<String> values,
+    Map<String, int> colWidths,
+    {bool isHeader = false}
+  ) {
+    final columns = [
+      'sno', 'item', 'hsn', 'qty', 'rsp', 'disc', 'unitPrice', 'total', 
+      'gstPercent', 'gstAmount', 'lineTotal', 'deliveryDate'
+    ];
+    
+    final buffer = StringBuffer();
+    buffer.write('│');
+    
+    for (var i = 0; i < columns.length && i < values.length; i++) {
+      final colKey = columns[i];
+      final width = colWidths[colKey] ?? 10;
+      final value = values[i];
+      
+      // Truncate or pad the value
+      String formattedValue;
+      if (value.length > width) {
+        formattedValue = value.substring(0, width - 1) + '…';
+      } else {
+        if (i == 1) {
+          // Left align item description
+          formattedValue = value.padRight(width);
+        } else {
+          // Center align other columns
+          final padding = width - value.length;
+          final leftPad = padding ~/ 2;
+          final rightPad = padding - leftPad;
+          formattedValue = ' ' * leftPad + value + ' ' * rightPad;
+        }
+      }
+      
+      buffer.write(' $formattedValue │');
+    }
     
     return buffer.toString();
   }
