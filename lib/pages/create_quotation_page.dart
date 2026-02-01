@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/product.dart';
 import '../models/quotation_item.dart';
 import '../database/database_helper.dart';
@@ -1314,13 +1315,495 @@ class _QuotationPreviewDialog extends StatelessWidget {
     );
   }
 
-  void _emailQuotation(BuildContext context) {
-    // TODO: Implement quotation email
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email functionality will be implemented'),
-        backgroundColor: Colors.orange,
-      ),
+  Future<void> _emailQuotation(BuildContext context) async {
+    try {
+      // Calculate totals
+      double totalAmount = 0;
+      double totalGstAmount = 0;
+      double grandTotal = 0;
+      for (var item in items) {
+        totalAmount += item.unitPrice;
+        totalGstAmount += item.gstAmount;
+        grandTotal += item.lineTotal;
+      }
+
+      // Generate PDF
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4.landscape,
+          margin: const pw.EdgeInsets.all(30),
+          build: (pw.Context context) {
+            return _buildPdfContent(
+              quotationNumber: quotationNumber,
+              quotationDate: quotationDate,
+              customerName: customerName,
+              customerAddress: customerAddress,
+              customerContact: customerContact,
+              items: items,
+              totalAmount: totalAmount,
+              totalGstAmount: totalGstAmount,
+              grandTotal: grandTotal,
+            );
+          },
+        ),
+      );
+
+      final pdfBytes = await pdf.save();
+
+      // Create email body with formatted quotation data
+      final emailBody = _buildEmailBody(
+        quotationNumber: quotationNumber,
+        quotationDate: quotationDate,
+        customerName: customerName,
+        customerAddress: customerAddress,
+        customerContact: customerContact,
+        items: items,
+        totalAmount: totalAmount,
+        totalGstAmount: totalGstAmount,
+        grandTotal: grandTotal,
+      );
+
+      // Save PDF temporarily
+      final output = await getTemporaryDirectory();
+      final pdfFile = File('${output.path}/quotation_$quotationNumber.pdf');
+      await pdfFile.writeAsBytes(pdfBytes);
+
+      // Create mailto URL with subject and body
+      final subject = Uri.encodeComponent('Quotation #$quotationNumber - Ashoka Bearing Enterprises');
+      final body = Uri.encodeComponent(emailBody);
+
+      // Use mailto: to open default email client
+      final mailtoUri = Uri.parse('mailto:?subject=$subject&body=$body');
+
+      try {
+        // Try to launch URL directly (works better on Windows)
+        await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Email client opened. PDF saved at: ${pdfFile.path}\nPlease attach the PDF manually.'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      } catch (e) {
+        // If launch fails, show the email body and PDF path for manual copy
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Email Information'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Could not open email client automatically. Please use the information below:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('PDF Location:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    SelectableText(pdfFile.path),
+                    const SizedBox(height: 16),
+                    const Text('Email Subject:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    SelectableText('Quotation #$quotationNumber - Ashoka Bearing Enterprises'),
+                    const SizedBox(height: 16),
+                    const Text('Email Body:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: SelectableText(
+                        emailBody,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error preparing email: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _buildEmailBody({
+    required String quotationNumber,
+    required DateTime quotationDate,
+    required String customerName,
+    required String customerAddress,
+    required String customerContact,
+    required List<QuotationItem> items,
+    required double totalAmount,
+    required double totalGstAmount,
+    required double grandTotal,
+  }) {
+    final buffer = StringBuffer();
+    buffer.writeln('Dear ${customerName.isEmpty ? "Customer" : customerName},');
+    buffer.writeln('');
+    buffer.writeln('Please find below the quotation details:');
+    buffer.writeln('');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('QUOTATION DETAILS');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('');
+    buffer.writeln('Quotation Number: $quotationNumber');
+    buffer.writeln('Quotation Date: ${DateFormat('dd-MM-yyyy').format(quotationDate)}');
+    buffer.writeln('');
+    buffer.writeln('Customer Details:');
+    buffer.writeln('  Name: ${customerName.isEmpty ? "Customer Name" : customerName}');
+    buffer.writeln('  Address: ${customerAddress.isEmpty ? "Address" : customerAddress}');
+    buffer.writeln('  Contact: ${customerContact.isEmpty ? "Contact Number" : customerContact}');
+    buffer.writeln('');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('ITEM DETAILS');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('');
+    buffer.writeln('S.No. | Item Description | HSN Code | Qty | RSP(INR) | Disc% | Unit Price | Total | GST % | GST Amount | Line Total | Delivery Date');
+    buffer.writeln('-' * 120);
+    
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i];
+      buffer.writeln(
+        '${i + 1} | ${item.product?.itemName ?? ""} | ${item.hsnCode} | ${item.qty.toStringAsFixed(0)} | '
+        'Rs.${item.rsp.toStringAsFixed(2)} | ${item.discPercent.toStringAsFixed(0)}% | '
+        'Rs.${item.unitPrice.toStringAsFixed(2)} | Rs.${item.total.toStringAsFixed(2)} | '
+        '${item.gstPercent.toStringAsFixed(0)}% | Rs.${item.gstAmount.toStringAsFixed(2)} | '
+        'Rs.${item.lineTotal.toStringAsFixed(2)} | '
+        '${item.deliveryDate != null ? DateFormat('dd-MM-yyyy').format(item.deliveryDate!) : ""}'
+      );
+    }
+    
+    buffer.writeln('');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('TOTALS');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('');
+    buffer.writeln('Subtotal:     Rs.${totalAmount.toStringAsFixed(2)}');
+    buffer.writeln('GST Amount:   Rs.${totalGstAmount.toStringAsFixed(2)}');
+    buffer.writeln('Grand Total:  Rs.${grandTotal.toStringAsFixed(2)}');
+    buffer.writeln('');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('TERMS & CONDITIONS');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('');
+    buffer.writeln('Taxes amounting 18% of the total value will be included in the invoice');
+    buffer.writeln('Lorem Ipsum Doler Sit Amet');
+    buffer.writeln('');
+    buffer.writeln('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    buffer.writeln('');
+    buffer.writeln('Please find the detailed quotation attached as PDF.');
+    buffer.writeln('');
+    buffer.writeln('Best Regards,');
+    buffer.writeln('Ashoka Bearing Enterprises');
+    buffer.writeln('2, Ring Rd, Awas Vikas, Rudrapur, Jagatpura, Uttarakhand 263153');
+    
+    return buffer.toString();
+  }
+
+  pw.Widget _buildPdfContent({
+    required String quotationNumber,
+    required DateTime quotationDate,
+    required String customerName,
+    required String customerAddress,
+    required String customerContact,
+    required List<QuotationItem> items,
+    required double totalAmount,
+    required double totalGstAmount,
+    required double grandTotal,
+  }) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        // Header Section
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            // Company Details (Left)
+            pw.Expanded(
+              flex: 2,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Row(
+                    children: [
+                      // Company Logo
+                      pw.Container(
+                        width: 50,
+                        height: 50,
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.blue700,
+                          shape: pw.BoxShape.circle,
+                        ),
+                        child: pw.Center(
+                          child: pw.Column(
+                            mainAxisAlignment: pw.MainAxisAlignment.center,
+                            children: [
+                              pw.Text(
+                                'ABE',
+                                style: pw.TextStyle(
+                                  color: PdfColors.white,
+                                  fontSize: 16,
+                                  fontWeight: pw.FontWeight.bold,
+                                ),
+                              ),
+                              pw.Text(
+                                'GROUP',
+                                style: pw.TextStyle(
+                                  color: PdfColors.white,
+                                  fontSize: 8,
+                                  fontWeight: pw.FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(width: 12),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'Ashoka Bearing Enterprises',
+                              style: pw.TextStyle(
+                                fontSize: 18,
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                            pw.SizedBox(height: 4),
+                            pw.Text(
+                              '2, Ring Rd, Awas Vikas, Rudrapur, Jagatpura, Uttarakhand 263153',
+                              style: const pw.TextStyle(fontSize: 12),
+                            ),
+                            pw.SizedBox(height: 4),
+                            pw.Text(
+                              'GSTIN No.: XXXXXXX XXXXXXXX',
+                              style: const pw.TextStyle(fontSize: 12),
+                            ),
+                            pw.Text(
+                              'PAN No.: XXXXX XXXXXX',
+                              style: const pw.TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 16),
+            // Customer Details (Right)
+            pw.Expanded(
+              flex: 1,
+              child: pw.Container(
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300),
+                  borderRadius: pw.BorderRadius.circular(4),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Customer Details',
+                      style: pw.TextStyle(
+                        fontSize: 14,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      customerName.isEmpty ? 'Customer Name' : customerName,
+                      style: const pw.TextStyle(fontSize: 12),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      customerAddress.isEmpty ? 'Address' : customerAddress,
+                      style: const pw.TextStyle(fontSize: 12),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      customerContact.isEmpty
+                          ? 'Contact.: XXXXXXX XXXXXXXX'
+                          : 'Contact.: $customerContact',
+                      style: const pw.TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 16),
+        // Quotation Number and Date
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Text(
+              'Quotation Number: $quotationNumber',
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.Text(
+              'Quotation Date: ${DateFormat('dd-MM-yyyy').format(quotationDate)}',
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        pw.SizedBox(height: 16),
+        // Item Details Table
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300),
+          columnWidths: {
+            0: const pw.FixedColumnWidth(40),
+            1: const pw.FlexColumnWidth(3),
+            2: const pw.FlexColumnWidth(1.5),
+            3: const pw.FixedColumnWidth(40),
+            4: const pw.FlexColumnWidth(1.5),
+            5: const pw.FixedColumnWidth(50),
+            6: const pw.FlexColumnWidth(1.5),
+            7: const pw.FlexColumnWidth(1.5),
+            8: const pw.FixedColumnWidth(50),
+            9: const pw.FlexColumnWidth(1.5),
+            10: const pw.FlexColumnWidth(1.5),
+            11: const pw.FlexColumnWidth(2),
+          },
+          children: [
+            // Table Header
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+              children: [
+                _buildPdfCell('S.No.', isHeader: true),
+                _buildPdfCell('Item Description', isHeader: true),
+                _buildPdfCell('HSN Code', isHeader: true),
+                _buildPdfCell('Qty', isHeader: true),
+                _buildPdfCell('RSP(INR)', isHeader: true),
+                _buildPdfCell('Disc%', isHeader: true),
+                _buildPdfCell('Unit Price', isHeader: true),
+                _buildPdfCell('Total', isHeader: true),
+                _buildPdfCell('GST %', isHeader: true),
+                _buildPdfCell('GST Amount', isHeader: true),
+                _buildPdfCell('Line Total', isHeader: true),
+                _buildPdfCell('Delivery Date', isHeader: true),
+              ],
+            ),
+            // Table Rows
+            ...items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              return pw.TableRow(
+                decoration: pw.BoxDecoration(
+                  color: index % 2 == 0 ? PdfColors.white : PdfColors.grey100,
+                ),
+                children: [
+                  _buildPdfCell('${index + 1}'),
+                  _buildPdfCell(
+                    item.product?.itemName ?? '',
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                  _buildPdfCell(item.hsnCode),
+                  _buildPdfCell(item.qty.toStringAsFixed(0)),
+                  _buildPdfCell('Rs.${item.rsp.toStringAsFixed(2)}'),
+                  _buildPdfCell('${item.discPercent.toStringAsFixed(0)}%'),
+                  _buildPdfCell('Rs.${item.unitPrice.toStringAsFixed(2)}'),
+                  _buildPdfCell('Rs.${item.total.toStringAsFixed(2)}'),
+                  _buildPdfCell('${item.gstPercent.toStringAsFixed(0)}%'),
+                  _buildPdfCell('Rs.${item.gstAmount.toStringAsFixed(2)}'),
+                  _buildPdfCell(
+                    'Rs.${item.lineTotal.toStringAsFixed(2)}',
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                  _buildPdfCell(
+                    item.deliveryDate != null
+                        ? DateFormat('dd-MM-yyyy').format(item.deliveryDate!)
+                        : '',
+                  ),
+                ],
+              );
+            }),
+          ],
+        ),
+        pw.SizedBox(height: 16),
+        // Totals Section
+        pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Container(
+            padding: const pw.EdgeInsets.all(12),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey300),
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                _buildPdfTotalRow('Subtotal:', 'Rs.${totalAmount.toStringAsFixed(2)}'),
+                pw.SizedBox(height: 6),
+                _buildPdfTotalRow('GST Amount:', 'Rs.${totalGstAmount.toStringAsFixed(2)}'),
+                pw.SizedBox(height: 6),
+                _buildPdfTotalRow(
+                  'Grand Total:',
+                  'Rs.${grandTotal.toStringAsFixed(2)}',
+                  isBold: true,
+                  fontSize: 14,
+                ),
+              ],
+            ),
+          ),
+        ),
+        pw.SizedBox(height: 16),
+        // Terms & Conditions
+        pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(
+              'T&Cs:',
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'Taxes amounting 18% of the total value will be included in the invoice',
+              style: const pw.TextStyle(fontSize: 12),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'Lorem Ipsum Doler Sit Amet',
+              style: const pw.TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
