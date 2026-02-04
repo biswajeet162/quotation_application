@@ -62,18 +62,24 @@ class NavigationSidebar extends StatelessWidget {
                   isSelected: selectedIndex == 3,
                   onTap: () => onItemSelected(3),
                 ),
+                _NavItem(
+                  icon: Icons.business,
+                  title: 'Companies',
+                  isSelected: selectedIndex == 4,
+                  onTap: () => onItemSelected(4),
+                ),
                 if (isAdmin)
                   _NavItem(
                     icon: Icons.people,
                     title: 'User Management',
-                    isSelected: selectedIndex == 4,
-                    onTap: () => onItemSelected(4),
+                    isSelected: selectedIndex == 5,
+                    onTap: () => onItemSelected(5),
                   ),
                 _NavItem(
                   icon: Icons.settings,
                   title: 'Settings',
-                  isSelected: selectedIndex == (isAdmin ? 5 : 4),
-                  onTap: () => onItemSelected(isAdmin ? 5 : 4),
+                  isSelected: selectedIndex == (isAdmin ? 6 : 5),
+                  onTap: () => onItemSelected(isAdmin ? 6 : 5),
                 ),
               ],
             ),

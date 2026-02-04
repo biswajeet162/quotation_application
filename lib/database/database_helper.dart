@@ -6,6 +6,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/product.dart';
 import '../models/user.dart';
+import '../models/company.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -45,7 +46,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -81,8 +82,22 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE companies (
+        id $idType,
+        name $textType,
+        address $textType,
+        mobile $textType,
+        email $textType,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
     // Create default admin user
     await _createDefaultAdmin(db);
+    
+    // Insert dummy companies data
+    await _insertDummyCompanies(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -157,6 +172,21 @@ class DatabaseHelper {
         }
       }
     }
+    if (oldVersion < 5) {
+      // Add companies table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS companies (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          address TEXT NOT NULL,
+          mobile TEXT NOT NULL,
+          email TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      ''');
+      // Insert dummy companies data
+      await _insertDummyCompanies(db);
+    }
   }
 
   Future<void> _createDefaultAdmin(Database db) async {
@@ -174,6 +204,60 @@ class DatabaseHelper {
       });
     } catch (e) {
       // Admin user might already exist, ignore error
+    }
+  }
+
+  Future<void> _insertDummyCompanies(Database db) async {
+    try {
+      // Check if companies table exists and has data
+      final existingCompanies = await db.query('companies');
+      if (existingCompanies.isNotEmpty) {
+        return; // Don't insert if companies already exist
+      }
+
+      final dummyCompanies = [
+        {
+          'name': 'ABC Corporation',
+          'address': '123 Business Street, Mumbai, Maharashtra 400001',
+          'mobile': '+91 98765 43210',
+          'email': 'contact@abccorp.com',
+          'createdAt': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
+        },
+        {
+          'name': 'XYZ Industries Ltd',
+          'address': '456 Industrial Area, Delhi, Delhi 110001',
+          'mobile': '+91 98765 43211',
+          'email': 'info@xyzindustries.com',
+          'createdAt': DateTime.now().subtract(const Duration(days: 25)).toIso8601String(),
+        },
+        {
+          'name': 'Tech Solutions Pvt Ltd',
+          'address': '789 Tech Park, Bangalore, Karnataka 560001',
+          'mobile': '+91 98765 43212',
+          'email': 'sales@techsolutions.in',
+          'createdAt': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
+        },
+        {
+          'name': 'Global Trading Company',
+          'address': '321 Trade Center, Chennai, Tamil Nadu 600001',
+          'mobile': '+91 98765 43213',
+          'email': 'info@globaltrading.co.in',
+          'createdAt': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
+        },
+        {
+          'name': 'Prime Manufacturing Co',
+          'address': '654 Factory Road, Pune, Maharashtra 411001',
+          'mobile': '+91 98765 43214',
+          'email': 'contact@primemanufacturing.com',
+          'createdAt': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
+        },
+      ];
+
+      for (var company in dummyCompanies) {
+        await db.insert('companies', company);
+      }
+    } catch (e) {
+      // Companies might already exist or table doesn't exist yet, ignore error
     }
   }
 
@@ -329,6 +413,52 @@ class DatabaseHelper {
     }
     return await db.delete(
       'users',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Company management methods
+  Future<int> insertCompany(Company company) async {
+    final db = await database;
+    return await db.insert('companies', company.toMap());
+  }
+
+  Future<List<Company>> getAllCompanies() async {
+    final db = await database;
+    final result = await db.query('companies', orderBy: 'createdAt DESC');
+    return result.map((map) => Company.fromMap(map)).toList();
+  }
+
+  Future<Company?> getCompanyById(int id) async {
+    final db = await database;
+    final result = await db.query(
+      'companies',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return Company.fromMap(result.first);
+  }
+
+  Future<int> updateCompany(Company company) async {
+    final db = await database;
+    return await db.update(
+      'companies',
+      company.toMap(),
+      where: 'id = ?',
+      whereArgs: [company.id],
+    );
+  }
+
+  Future<int> deleteCompany(int id) async {
+    final db = await database;
+    return await db.delete(
+      'companies',
       where: 'id = ?',
       whereArgs: [id],
     );

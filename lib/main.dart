@@ -6,6 +6,7 @@ import 'pages/login_page.dart';
 import 'pages/user_management_page.dart';
 import 'pages/password_reset_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/companies_page.dart';
 import 'widgets/navigation_sidebar.dart';
 import 'widgets/page_header.dart';
 import 'services/auth_service.dart';
@@ -71,12 +72,13 @@ class _MainScreenState extends State<MainScreen> {
       const PlaceholderPage(title: 'Dashboard'),
       const CreateQuotationPage(),
       const PlaceholderPage(title: 'Quotation History'),
+      const CompaniesPage(),
       SettingsPage(userEmail: authService.currentUser?.email ?? ''),
     ];
 
-    // Insert user management page for admin (index 4, before Settings)
+    // Insert user management page for admin (index 5, before Settings)
     if (isAdmin) {
-      pages.insert(4, const UserManagementPage());
+      pages.insert(5, const UserManagementPage());
     }
 
     return pages;
