@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -47,7 +48,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 6,
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -108,6 +109,7 @@ class DatabaseHelper {
         totalGstAmount $realType,
         grandTotal $realType,
         action $textType,
+        createdBy $textType,
         createdAt TEXT NOT NULL
       )
     ''');
@@ -225,6 +227,24 @@ class DatabaseHelper {
           createdAt TEXT NOT NULL
         )
       ''');
+    }
+    if (oldVersion < 7) {
+      // Add createdBy column to quotations_history table
+      try {
+        // Check if column already exists
+        final tableInfo = await db.rawQuery('PRAGMA table_info(quotations_history)');
+        final hasCreatedBy = tableInfo.any((col) => col['name'] == 'createdBy');
+        
+        if (!hasCreatedBy) {
+          // SQLite doesn't support NOT NULL with DEFAULT in ALTER TABLE, so add as nullable first
+          await db.execute('ALTER TABLE quotations_history ADD COLUMN createdBy TEXT');
+          // Update existing records to have a default value
+          await db.update('quotations_history', {'createdBy': 'Unknown'}, where: 'createdBy IS NULL');
+        }
+      } catch (e) {
+        // Column might already exist or other error, log but continue
+        debugPrint('Error adding createdBy column: $e');
+      }
     }
   }
 
@@ -506,7 +526,29 @@ class DatabaseHelper {
   // Quotation History management methods
   Future<int> insertQuotationHistory(QuotationHistory quotationHistory) async {
     final db = await database;
-    return await db.insert('quotations_history', quotationHistory.toMap());
+    try {
+      return await db.insert('quotations_history', quotationHistory.toMap());
+    } catch (e) {
+      // If error is due to missing createdBy column, try to add it and retry
+      if (e.toString().contains('createdBy') || e.toString().contains('no such column')) {
+        try {
+          // Check if column exists
+          final tableInfo = await db.rawQuery('PRAGMA table_info(quotations_history)');
+          final hasCreatedBy = tableInfo.any((col) => col['name'] == 'createdBy');
+          
+          if (!hasCreatedBy) {
+            await db.execute('ALTER TABLE quotations_history ADD COLUMN createdBy TEXT');
+            await db.update('quotations_history', {'createdBy': 'Unknown'}, where: 'createdBy IS NULL');
+          }
+          // Retry insert
+          return await db.insert('quotations_history', quotationHistory.toMap());
+        } catch (e2) {
+          debugPrint('Error inserting quotation history after migration: $e2');
+          rethrow;
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<List<QuotationHistory>> getAllQuotationHistory() async {
@@ -532,6 +574,7 @@ class DatabaseHelper {
             totalGstAmount REAL NOT NULL,
             grandTotal REAL NOT NULL,
             action TEXT NOT NULL,
+            createdBy TEXT NOT NULL,
             createdAt TEXT NOT NULL
           )
         ''');

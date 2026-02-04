@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/product.dart';
 import '../models/quotation_item.dart';
 import '../models/company.dart';
 import '../models/quotation_history.dart';
 import '../database/database_helper.dart';
+import '../services/auth_service.dart';
 import 'quotation_preview_page.dart';
 import '../widgets/page_header.dart';
 
@@ -352,6 +354,12 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
 
     // Save quotation to history
     try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      final createdBy = currentUser?.name.isNotEmpty == true
+          ? currentUser!.name
+          : (currentUser?.email ?? 'Unknown');
+      
       final quotationHistory = QuotationHistory(
         quotationNumber: _generateQuotationNumber(),
         quotationDate: _selectedDate ?? DateTime.now(),
@@ -364,6 +372,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         totalGstAmount: totalGstAmount,
         grandTotal: grandTotal,
         action: 'saved',
+        createdBy: createdBy,
         createdAt: DateTime.now(),
       );
 

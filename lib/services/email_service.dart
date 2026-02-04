@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../models/quotation_item.dart';
 import '../models/quotation_history.dart';
 import '../database/database_helper.dart';
+import '../services/auth_service.dart';
 import 'pdf_service.dart';
 
 class EmailService {
@@ -68,6 +70,7 @@ class EmailService {
         
         // Save to quotation history
         await _saveQuotationHistory(
+          context: context,
           quotationNumber: quotationNumber,
           quotationDate: quotationDate,
           customerName: customerName,
@@ -94,6 +97,7 @@ class EmailService {
         // If launch fails, show the email body and PDF path for manual copy
         // Still save to history even if email client fails to open
         await _saveQuotationHistory(
+          context: context,
           quotationNumber: quotationNumber,
           quotationDate: quotationDate,
           customerName: customerName,
@@ -349,6 +353,7 @@ class EmailService {
 
   /// Saves quotation to history
   static Future<void> _saveQuotationHistory({
+    required BuildContext context,
     required String quotationNumber,
     required DateTime quotationDate,
     required String customerName,
@@ -362,6 +367,12 @@ class EmailService {
     required String action,
   }) async {
     try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      final createdBy = currentUser?.name.isNotEmpty == true
+          ? currentUser!.name
+          : (currentUser?.email ?? 'Unknown');
+      
       final quotationHistory = QuotationHistory(
         quotationNumber: quotationNumber,
         quotationDate: quotationDate,
@@ -374,6 +385,7 @@ class EmailService {
         totalGstAmount: totalGstAmount,
         grandTotal: grandTotal,
         action: action,
+        createdBy: createdBy,
         createdAt: DateTime.now(),
       );
 

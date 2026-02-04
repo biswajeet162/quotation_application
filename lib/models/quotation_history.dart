@@ -15,6 +15,7 @@ class QuotationHistory {
   final double totalGstAmount;
   final double grandTotal;
   final String action; // 'download' or 'email'
+  final String createdBy; // User who created the quotation
   final DateTime createdAt;
 
   QuotationHistory({
@@ -30,6 +31,7 @@ class QuotationHistory {
     required this.totalGstAmount,
     required this.grandTotal,
     required this.action,
+    required this.createdBy,
     required this.createdAt,
   });
 
@@ -65,6 +67,7 @@ class QuotationHistory {
       'totalGstAmount': totalGstAmount,
       'grandTotal': grandTotal,
       'action': action,
+      'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -123,6 +126,7 @@ class QuotationHistory {
       totalGstAmount: (map['totalGstAmount'] as num).toDouble(),
       grandTotal: (map['grandTotal'] as num).toDouble(),
       action: map['action'] as String,
+      createdBy: map['createdBy'] as String? ?? 'Unknown',
       createdAt: DateTime.parse(map['createdAt'] as String),
     );
   }

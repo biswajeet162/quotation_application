@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -8,6 +9,7 @@ import 'package:intl/intl.dart';
 import '../models/quotation_item.dart';
 import '../models/quotation_history.dart';
 import '../database/database_helper.dart';
+import '../services/auth_service.dart';
 
 class PdfService {
   /// Generates and saves a quotation PDF
@@ -66,6 +68,7 @@ class PdfService {
 
         // Save to quotation history
         await _saveQuotationHistory(
+          context: context,
           quotationNumber: quotationNumber,
           quotationDate: quotationDate,
           customerName: customerName,
@@ -96,6 +99,7 @@ class PdfService {
 
         // Save to quotation history even if user cancelled file picker
         await _saveQuotationHistory(
+          context: context,
           quotationNumber: quotationNumber,
           quotationDate: quotationDate,
           customerName: customerName,
@@ -489,6 +493,7 @@ class PdfService {
 
   /// Saves quotation to history
   static Future<void> _saveQuotationHistory({
+    required BuildContext context,
     required String quotationNumber,
     required DateTime quotationDate,
     required String customerName,
@@ -502,6 +507,12 @@ class PdfService {
     required String action,
   }) async {
     try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUser = authService.currentUser;
+      final createdBy = currentUser?.name.isNotEmpty == true
+          ? currentUser!.name
+          : (currentUser?.email ?? 'Unknown');
+      
       final quotationHistory = QuotationHistory(
         quotationNumber: quotationNumber,
         quotationDate: quotationDate,
@@ -514,6 +525,7 @@ class PdfService {
         totalGstAmount: totalGstAmount,
         grandTotal: grandTotal,
         action: action,
+        createdBy: createdBy,
         createdAt: DateTime.now(),
       );
 

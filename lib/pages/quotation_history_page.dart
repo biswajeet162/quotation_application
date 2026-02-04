@@ -17,6 +17,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
   bool _isLoading = true;
   String _searchQuery = '';
   String _filterAction = 'all'; // 'all', 'download', 'email'
+  String _categorizationType = 'all'; // 'all', 'company', 'email', 'mobile'
 
   @override
   void initState() {
@@ -88,6 +89,59 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
     return filtered;
   }
 
+  // Get grouped quotations based on categorization type
+  Map<String, List<QuotationHistory>> get _groupedQuotations {
+    // First, sort all filtered quotations by date (descending - newest first)
+    final filtered = _filteredQuotations;
+    filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    
+    if (_categorizationType == 'all') {
+      return {'All Quotations': filtered};
+    }
+
+    final grouped = <String, List<QuotationHistory>>{};
+    
+    for (var quotation in filtered) {
+      String key;
+      switch (_categorizationType) {
+        case 'company':
+          key = quotation.customerName.isNotEmpty 
+              ? quotation.customerName 
+              : 'Unknown Company';
+          break;
+        case 'email':
+          key = quotation.customerEmail.isNotEmpty 
+              ? quotation.customerEmail 
+              : 'No Email';
+          break;
+        case 'mobile':
+          key = quotation.customerContact.isNotEmpty 
+              ? quotation.customerContact 
+              : 'No Mobile';
+          break;
+        default:
+          key = 'All';
+      }
+      
+      if (!grouped.containsKey(key)) {
+        grouped[key] = [];
+      }
+      grouped[key]!.add(quotation);
+    }
+
+    // Sort groups alphabetically, but keep quotations within each group sorted by date (descending)
+    final sortedKeys = grouped.keys.toList()..sort();
+    final sortedGrouped = <String, List<QuotationHistory>>{};
+    for (var key in sortedKeys) {
+      // Ensure quotations within each group are sorted by date (descending)
+      final groupQuotations = grouped[key]!;
+      groupQuotations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      sortedGrouped[key] = groupQuotations;
+    }
+
+    return sortedGrouped;
+  }
+
   Future<void> _deleteQuotation(QuotationHistory quotation) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -152,6 +206,274 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
     );
   }
 
+  Widget _buildGroupedQuotationsList() {
+    final grouped = _groupedQuotations;
+    
+    if (grouped.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: grouped.length,
+      itemBuilder: (context, groupIndex) {
+        final groupKey = grouped.keys.elementAt(groupIndex);
+        final quotations = grouped[groupKey]!;
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section Header
+            if (_categorizationType != 'all')
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _categorizationType == 'company'
+                          ? Icons.business
+                          : _categorizationType == 'email'
+                              ? Icons.email
+                              : Icons.phone,
+                      color: Colors.blue[700],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        groupKey,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[900],
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${quotations.length} quotation${quotations.length > 1 ? 's' : ''}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue[900],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Quotations in this group
+            ...quotations.map((quotation) => _buildQuotationCard(quotation)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildQuotationCard(QuotationHistory quotation) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      child: InkWell(
+        onTap: () => _viewQuotationDetails(quotation),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Quotation #${quotation.quotationNumber}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: quotation.action == 'download'
+                                    ? Colors.blue[100]
+                                    : quotation.action == 'email'
+                                        ? Colors.orange[100]
+                                        : Colors.green[100],
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    quotation.action == 'download'
+                                        ? Icons.download
+                                        : quotation.action == 'email'
+                                            ? Icons.email
+                                            : Icons.save,
+                                    size: 14,
+                                    color: quotation.action == 'download'
+                                        ? Colors.blue[700]
+                                        : quotation.action == 'email'
+                                            ? Colors.orange[700]
+                                            : Colors.green[700],
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    quotation.action == 'download'
+                                        ? 'Downloaded'
+                                        : quotation.action == 'email'
+                                            ? 'Emailed'
+                                            : 'Saved',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: quotation.action == 'download'
+                                          ? Colors.blue[700]
+                                          : quotation.action == 'email'
+                                              ? Colors.orange[700]
+                                              : Colors.green[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Show company name only if not categorizing by company
+                        if (_categorizationType != 'company')
+                          Text(
+                            quotation.customerName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        // Show email only if not categorizing by email
+                        if (_categorizationType != 'email' &&
+                            quotation.customerEmail.isNotEmpty)
+                          Text(
+                            quotation.customerEmail,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        // Show mobile only if not categorizing by mobile
+                        if (_categorizationType != 'mobile' &&
+                            quotation.customerContact.isNotEmpty)
+                          Text(
+                            quotation.customerContact,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '₹${quotation.grandTotal.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        DateFormat('dd-MM-yyyy')
+                            .format(quotation.quotationDate),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${quotation.items.length} item(s)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline,
+                              size: 14,
+                              color: Colors.grey[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Created by: ${quotation.createdBy}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    DateFormat('dd-MM-yyyy HH:mm')
+                        .format(quotation.createdAt),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    tooltip: 'Delete',
+                    onPressed: () => _deleteQuotation(quotation),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -187,7 +509,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Filter dropdown
+                // Action Filter dropdown
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
@@ -207,6 +529,31 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                     onChanged: (value) {
                       setState(() {
                         _filterAction = value!;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Categorization dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[400]!),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: DropdownButton<String>(
+                    value: _categorizationType,
+                    underline: const SizedBox(),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('All')),
+                      DropdownMenuItem(value: 'company', child: Text('By Company')),
+                      DropdownMenuItem(value: 'email', child: Text('By Email')),
+                      DropdownMenuItem(value: 'mobile', child: Text('By Mobile Number')),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _categorizationType = value!;
                       });
                     },
                   ),
@@ -236,7 +583,8 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _searchQuery.isNotEmpty || _filterAction != 'all'
+                              _searchQuery.isNotEmpty || 
+                              _filterAction != 'all'
                                   ? 'No quotations found matching your criteria'
                                   : 'No quotation history yet',
                               style: TextStyle(
@@ -258,198 +606,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                           ],
                         ),
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _filteredQuotations.length,
-                        itemBuilder: (context, index) {
-                          final quotation = _filteredQuotations[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 2,
-                            child: InkWell(
-                              onTap: () => _viewQuotationDetails(quotation),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    'Quotation #${quotation.quotationNumber}',
-                                                    style: const TextStyle(
-                                                      fontSize: 18,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                            horizontal: 8,
-                                                            vertical: 4),
-                                                    decoration: BoxDecoration(
-                                                      color: quotation.action ==
-                                                              'download'
-                                                          ? Colors.blue[100]
-                                                          : quotation.action ==
-                                                                  'email'
-                                                              ? Colors.orange[100]
-                                                              : Colors.green[100],
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              4),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        Icon(
-                                                          quotation.action ==
-                                                                  'download'
-                                                              ? Icons.download
-                                                              : quotation.action ==
-                                                                      'email'
-                                                                  ? Icons.email
-                                                                  : Icons.save,
-                                                          size: 14,
-                                                          color: quotation
-                                                                      .action ==
-                                                                  'download'
-                                                              ? Colors.blue[700]
-                                                              : quotation
-                                                                          .action ==
-                                                                      'email'
-                                                                  ? Colors
-                                                                      .orange[700]
-                                                                  : Colors
-                                                                      .green[700],
-                                                        ),
-                                                        const SizedBox(
-                                                            width: 4),
-                                                        Text(
-                                                          quotation.action ==
-                                                                  'download'
-                                                              ? 'Downloaded'
-                                                              : quotation.action ==
-                                                                      'email'
-                                                                  ? 'Emailed'
-                                                                  : 'Saved',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color: quotation
-                                                                        .action ==
-                                                                    'download'
-                                                                ? Colors
-                                                                    .blue[700]
-                                                                : quotation
-                                                                            .action ==
-                                                                        'email'
-                                                                    ? Colors
-                                                                        .orange[700]
-                                                                    : Colors
-                                                                        .green[700],
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                quotation.customerName,
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                              if (quotation.customerEmail
-                                                  .isNotEmpty)
-                                                Text(
-                                                  quotation.customerEmail,
-                                                  style: TextStyle(
-                                                    fontSize: 14,
-                                                    color: Colors.grey[600],
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              '₹${quotation.grandTotal.toStringAsFixed(2)}',
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.green,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              DateFormat('dd-MM-yyyy')
-                                                  .format(quotation.quotationDate),
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[600],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '${quotation.items.length} item(s)',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          DateFormat('dd-MM-yyyy HH:mm')
-                                              .format(quotation.createdAt),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline,
-                                              color: Colors.red),
-                                          tooltip: 'Delete',
-                                          onPressed: () =>
-                                              _deleteQuotation(quotation),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                    : _buildGroupedQuotationsList(),
           ),
         ],
       ),
