@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class NavigationSidebar extends StatelessWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
+  final bool isAdmin;
 
   const NavigationSidebar({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    this.isAdmin = false,
   });
 
   @override
@@ -60,11 +62,18 @@ class NavigationSidebar extends StatelessWidget {
                   isSelected: selectedIndex == 3,
                   onTap: () => onItemSelected(3),
                 ),
+                if (isAdmin)
+                  _NavItem(
+                    icon: Icons.people,
+                    title: 'User Management',
+                    isSelected: selectedIndex == 4,
+                    onTap: () => onItemSelected(4),
+                  ),
                 _NavItem(
                   icon: Icons.settings,
                   title: 'Settings',
-                  isSelected: selectedIndex == 4,
-                  onTap: () => onItemSelected(4),
+                  isSelected: selectedIndex == (isAdmin ? 5 : 4),
+                  onTap: () => onItemSelected(isAdmin ? 5 : 4),
                 ),
               ],
             ),

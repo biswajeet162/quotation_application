@@ -1,8 +1,11 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/product.dart';
+import '../models/user.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -42,7 +45,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -63,6 +66,19 @@ class DatabaseHelper {
         hsnCode $textType
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE users (
+        id $idType,
+        email $textType UNIQUE,
+        password $textType,
+        role $textType,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    // Create default admin user
+    await _createDefaultAdmin(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -70,6 +86,47 @@ class DatabaseHelper {
       // Add itemNumber column to existing database
       await db.execute('ALTER TABLE products ADD COLUMN itemNumber TEXT NOT NULL DEFAULT ""');
     }
+    if (oldVersion < 3) {
+      // Add users table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          email TEXT NOT NULL UNIQUE,
+          password TEXT NOT NULL,
+          role TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      ''');
+      // Create default admin user if it doesn't exist
+      final adminExists = await db.query(
+        'users',
+        where: 'email = ?',
+        whereArgs: ['admin@gmail.com'],
+      );
+      if (adminExists.isEmpty) {
+        await _createDefaultAdmin(db);
+      }
+    }
+  }
+
+  Future<void> _createDefaultAdmin(Database db) async {
+    try {
+      final adminPassword = _hashPassword('Admin');
+      await db.insert('users', {
+        'email': 'admin@gmail.com',
+        'password': adminPassword,
+        'role': 'admin',
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      // Admin user might already exist, ignore error
+    }
+  }
+
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
   }
 
   Future<int> insertProduct(Product product) async {
@@ -120,6 +177,80 @@ class DatabaseHelper {
   Future<void> clearAllProducts() async {
     final db = await database;
     await db.delete('products');
+  }
+
+  // User management methods
+  Future<User?> authenticateUser(String email, String password) async {
+    final db = await database;
+    final hashedPassword = _hashPassword(password);
+    final result = await db.query(
+      'users',
+      where: 'email = ? AND password = ?',
+      whereArgs: [email, hashedPassword],
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return User.fromMap(result.first);
+  }
+
+  Future<User?> getUserByEmail(String email) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return User.fromMap(result.first);
+  }
+
+  Future<int> createUser(String email, String password, String role) async {
+    final db = await database;
+    final hashedPassword = _hashPassword(password);
+    return await db.insert('users', {
+      'email': email,
+      'password': hashedPassword,
+      'role': role,
+      'createdAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<int> updateUserPassword(int userId, String newPassword) async {
+    final db = await database;
+    final hashedPassword = _hashPassword(newPassword);
+    return await db.update(
+      'users',
+      {'password': hashedPassword},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<List<User>> getAllUsers() async {
+    final db = await database;
+    final result = await db.query('users', orderBy: 'createdAt DESC');
+    return result.map((map) => User.fromMap(map)).toList();
+  }
+
+  Future<int> deleteUser(int id) async {
+    final db = await database;
+    // Prevent deleting the default admin
+    final user = await db.query('users', where: 'id = ?', whereArgs: [id]);
+    if (user.isNotEmpty && user.first['email'] == 'admin@gmail.com') {
+      throw Exception('Cannot delete the default admin user');
+    }
+    return await db.delete(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> close() async {

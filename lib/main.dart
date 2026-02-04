@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'pages/products_page.dart';
 import 'pages/create_quotation_page.dart';
+import 'pages/login_page.dart';
+import 'pages/user_management_page.dart';
+import 'pages/password_reset_page.dart';
+import 'pages/settings_page.dart';
 import 'widgets/navigation_sidebar.dart';
+import 'services/auth_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -12,14 +18,34 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Quotation Application',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
+    return ChangeNotifierProvider(
+      create: (_) => AuthService(),
+      child: MaterialApp(
+        title: 'Quotation Application',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          useMaterial3: true,
+        ),
+        home: const AuthWrapper(),
+        debugShowCheckedModeBanner: false,
       ),
-      home: const MainScreen(),
-      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthService>(
+      builder: (context, authService, _) {
+        if (authService.isAuthenticated) {
+          return const MainScreen();
+        } else {
+          return const LoginPage();
+        }
+      },
     );
   }
 }
@@ -35,13 +61,25 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   bool _hasQuotationData = false;
 
-  final List<Widget> _pages = [
-    const ProductsPage(),
-    const PlaceholderPage(title: 'Dashboard'),
-    const CreateQuotationPage(),
-    const PlaceholderPage(title: 'Quotation History'),
-    const PlaceholderPage(title: 'Settings'),
-  ];
+  List<Widget> _buildPages(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isAdmin = authService.isAdmin;
+    
+    final pages = [
+      const ProductsPage(),
+      const PlaceholderPage(title: 'Dashboard'),
+      const CreateQuotationPage(),
+      const PlaceholderPage(title: 'Quotation History'),
+      SettingsPage(userEmail: authService.currentUser?.email ?? ''),
+    ];
+
+    // Insert user management page for admin (index 4, before Settings)
+    if (isAdmin) {
+      pages.insert(4, const UserManagementPage());
+    }
+
+    return pages;
+  }
 
   void _updateQuotationDataStatus(bool hasData) {
     setState(() {
@@ -87,19 +125,24 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final pages = _buildPages(context);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isAdmin = authService.isAdmin;
+
     return Scaffold(
       body: Row(
         children: [
           NavigationSidebar(
             selectedIndex: _selectedIndex,
             onItemSelected: _onItemSelected,
+            isAdmin: isAdmin,
           ),
           Expanded(
             child: _selectedIndex == 2
                 ? CreateQuotationPage(
                     onDataChanged: _updateQuotationDataStatus,
                   )
-                : _pages[_selectedIndex],
+                : pages[_selectedIndex],
           ),
         ],
       ),
