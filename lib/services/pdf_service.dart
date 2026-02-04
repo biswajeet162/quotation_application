@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../models/quotation_item.dart';
+import '../models/quotation_history.dart';
+import '../database/database_helper.dart';
 
 class PdfService {
   /// Generates and saves a quotation PDF
@@ -16,6 +18,7 @@ class PdfService {
     required String customerName,
     required String customerAddress,
     required String customerContact,
+    required String customerEmail,
     required List<QuotationItem> items,
     required double totalAmount,
     required double totalGstAmount,
@@ -61,6 +64,21 @@ class PdfService {
         final file = File(outputPath);
         await file.writeAsBytes(pdfBytes);
 
+        // Save to quotation history
+        await _saveQuotationHistory(
+          quotationNumber: quotationNumber,
+          quotationDate: quotationDate,
+          customerName: customerName,
+          customerAddress: customerAddress,
+          customerContact: customerContact,
+          customerEmail: customerEmail,
+          items: items,
+          totalAmount: totalAmount,
+          totalGstAmount: totalGstAmount,
+          grandTotal: grandTotal,
+          action: 'download',
+        );
+
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -75,6 +93,21 @@ class PdfService {
         final output = await getTemporaryDirectory();
         final file = File('${output.path}/quotation_$quotationNumber.pdf');
         await file.writeAsBytes(pdfBytes);
+
+        // Save to quotation history even if user cancelled file picker
+        await _saveQuotationHistory(
+          quotationNumber: quotationNumber,
+          quotationDate: quotationDate,
+          customerName: customerName,
+          customerAddress: customerAddress,
+          customerContact: customerContact,
+          customerEmail: customerEmail,
+          items: items,
+          totalAmount: totalAmount,
+          totalGstAmount: totalGstAmount,
+          grandTotal: grandTotal,
+          action: 'download',
+        );
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -452,6 +485,43 @@ class PdfService {
         ),
       ],
     );
+  }
+
+  /// Saves quotation to history
+  static Future<void> _saveQuotationHistory({
+    required String quotationNumber,
+    required DateTime quotationDate,
+    required String customerName,
+    required String customerAddress,
+    required String customerContact,
+    required String customerEmail,
+    required List<QuotationItem> items,
+    required double totalAmount,
+    required double totalGstAmount,
+    required double grandTotal,
+    required String action,
+  }) async {
+    try {
+      final quotationHistory = QuotationHistory(
+        quotationNumber: quotationNumber,
+        quotationDate: quotationDate,
+        customerName: customerName,
+        customerAddress: customerAddress,
+        customerContact: customerContact,
+        customerEmail: customerEmail,
+        items: items,
+        totalAmount: totalAmount,
+        totalGstAmount: totalGstAmount,
+        grandTotal: grandTotal,
+        action: action,
+        createdAt: DateTime.now(),
+      );
+
+      await DatabaseHelper.instance.insertQuotationHistory(quotationHistory);
+    } catch (e) {
+      // Silently handle errors - don't interrupt the download process
+      debugPrint('Error saving quotation history: $e');
+    }
   }
 }
 

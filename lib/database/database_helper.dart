@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/product.dart';
 import '../models/user.dart';
 import '../models/company.dart';
+import '../models/quotation_history.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -46,7 +47,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 5,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -89,6 +90,24 @@ class DatabaseHelper {
         address $textType,
         mobile $textType,
         email $textType,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE quotations_history (
+        id $idType,
+        quotationNumber $textType,
+        quotationDate TEXT NOT NULL,
+        customerName $textType,
+        customerAddress $textType,
+        customerContact $textType,
+        customerEmail $textType,
+        items TEXT NOT NULL,
+        totalAmount $realType,
+        totalGstAmount $realType,
+        grandTotal $realType,
+        action $textType,
         createdAt TEXT NOT NULL
       )
     ''');
@@ -186,6 +205,26 @@ class DatabaseHelper {
       ''');
       // Insert dummy companies data
       await _insertDummyCompanies(db);
+    }
+    if (oldVersion < 6) {
+      // Add quotations_history table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS quotations_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          quotationNumber TEXT NOT NULL,
+          quotationDate TEXT NOT NULL,
+          customerName TEXT NOT NULL,
+          customerAddress TEXT NOT NULL,
+          customerContact TEXT NOT NULL,
+          customerEmail TEXT NOT NULL,
+          items TEXT NOT NULL,
+          totalAmount REAL NOT NULL,
+          totalGstAmount REAL NOT NULL,
+          grandTotal REAL NOT NULL,
+          action TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      ''');
     }
   }
 
@@ -459,6 +498,97 @@ class DatabaseHelper {
     final db = await database;
     return await db.delete(
       'companies',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Quotation History management methods
+  Future<int> insertQuotationHistory(QuotationHistory quotationHistory) async {
+    final db = await database;
+    return await db.insert('quotations_history', quotationHistory.toMap());
+  }
+
+  Future<List<QuotationHistory>> getAllQuotationHistory() async {
+    final db = await database;
+    try {
+      // First check if table exists
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='quotations_history'",
+      );
+      if (tables.isEmpty) {
+        // Table doesn't exist, create it
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS quotations_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            quotationNumber TEXT NOT NULL,
+            quotationDate TEXT NOT NULL,
+            customerName TEXT NOT NULL,
+            customerAddress TEXT NOT NULL,
+            customerContact TEXT NOT NULL,
+            customerEmail TEXT NOT NULL,
+            items TEXT NOT NULL,
+            totalAmount REAL NOT NULL,
+            totalGstAmount REAL NOT NULL,
+            grandTotal REAL NOT NULL,
+            action TEXT NOT NULL,
+            createdAt TEXT NOT NULL
+          )
+        ''');
+      }
+      
+      final result = await db.query(
+        'quotations_history',
+        orderBy: 'createdAt DESC',
+      );
+      
+      final quotations = <QuotationHistory>[];
+      for (var map in result) {
+        try {
+          quotations.add(QuotationHistory.fromMap(map));
+        } catch (e) {
+          // Log error but continue processing other items
+          print('Error parsing quotation history item: $e');
+          print('Item data: $map');
+        }
+      }
+      return quotations;
+    } catch (e) {
+      print('Error querying quotations_history table: $e');
+      rethrow;
+    }
+  }
+
+  Future<QuotationHistory?> getQuotationHistoryById(int id) async {
+    final db = await database;
+    final result = await db.query(
+      'quotations_history',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return QuotationHistory.fromMap(result.first);
+  }
+
+  Future<List<QuotationHistory>> getQuotationHistoryByNumber(String quotationNumber) async {
+    final db = await database;
+    final result = await db.query(
+      'quotations_history',
+      where: 'quotationNumber = ?',
+      whereArgs: [quotationNumber],
+      orderBy: 'createdAt DESC',
+    );
+    return result.map((map) => QuotationHistory.fromMap(map)).toList();
+  }
+
+  Future<int> deleteQuotationHistory(int id) async {
+    final db = await database;
+    return await db.delete(
+      'quotations_history',
       where: 'id = ?',
       whereArgs: [id],
     );

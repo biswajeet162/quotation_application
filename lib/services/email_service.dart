@@ -4,6 +4,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../models/quotation_item.dart';
+import '../models/quotation_history.dart';
+import '../database/database_helper.dart';
 import 'pdf_service.dart';
 
 class EmailService {
@@ -15,6 +17,7 @@ class EmailService {
     required String customerName,
     required String customerAddress,
     required String customerContact,
+    required String customerEmail,
     required List<QuotationItem> items,
     required double totalAmount,
     required double totalGstAmount,
@@ -62,6 +65,22 @@ class EmailService {
       try {
         // Try to launch URL directly (works better on Windows)
         await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
+        
+        // Save to quotation history
+        await _saveQuotationHistory(
+          quotationNumber: quotationNumber,
+          quotationDate: quotationDate,
+          customerName: customerName,
+          customerAddress: customerAddress,
+          customerContact: customerContact,
+          customerEmail: customerEmail,
+          items: items,
+          totalAmount: totalAmount,
+          totalGstAmount: totalGstAmount,
+          grandTotal: grandTotal,
+          action: 'email',
+        );
+        
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -73,6 +92,21 @@ class EmailService {
         }
       } catch (e) {
         // If launch fails, show the email body and PDF path for manual copy
+        // Still save to history even if email client fails to open
+        await _saveQuotationHistory(
+          quotationNumber: quotationNumber,
+          quotationDate: quotationDate,
+          customerName: customerName,
+          customerAddress: customerAddress,
+          customerContact: customerContact,
+          customerEmail: customerEmail,
+          items: items,
+          totalAmount: totalAmount,
+          totalGstAmount: totalGstAmount,
+          grandTotal: grandTotal,
+          action: 'email',
+        );
+        
         if (context.mounted) {
           _showEmailInfoDialog(
             context: context,
@@ -311,6 +345,43 @@ class EmailService {
         ],
       ),
     );
+  }
+
+  /// Saves quotation to history
+  static Future<void> _saveQuotationHistory({
+    required String quotationNumber,
+    required DateTime quotationDate,
+    required String customerName,
+    required String customerAddress,
+    required String customerContact,
+    required String customerEmail,
+    required List<QuotationItem> items,
+    required double totalAmount,
+    required double totalGstAmount,
+    required double grandTotal,
+    required String action,
+  }) async {
+    try {
+      final quotationHistory = QuotationHistory(
+        quotationNumber: quotationNumber,
+        quotationDate: quotationDate,
+        customerName: customerName,
+        customerAddress: customerAddress,
+        customerContact: customerContact,
+        customerEmail: customerEmail,
+        items: items,
+        totalAmount: totalAmount,
+        totalGstAmount: totalGstAmount,
+        grandTotal: grandTotal,
+        action: action,
+        createdAt: DateTime.now(),
+      );
+
+      await DatabaseHelper.instance.insertQuotationHistory(quotationHistory);
+    } catch (e) {
+      // Silently handle errors - don't interrupt the email process
+      debugPrint('Error saving quotation history: $e');
+    }
   }
 }
 

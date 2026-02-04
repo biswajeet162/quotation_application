@@ -10,6 +10,7 @@ class QuotationPreviewPage extends StatelessWidget {
   final String customerName;
   final String customerAddress;
   final String customerContact;
+  final String customerEmail;
   final List<QuotationItem> items;
 
   const QuotationPreviewPage({
@@ -19,6 +20,7 @@ class QuotationPreviewPage extends StatelessWidget {
     required this.customerName,
     required this.customerAddress,
     required this.customerContact,
+    required this.customerEmail,
     required this.items,
   });
 
@@ -48,6 +50,7 @@ class QuotationPreviewPage extends StatelessWidget {
       customerName: customerName,
       customerAddress: customerAddress,
       customerContact: customerContact,
+      customerEmail: customerEmail,
       items: items,
       totalAmount: totals['totalAmount']!,
       totalGstAmount: totals['totalGstAmount']!,
@@ -64,6 +67,7 @@ class QuotationPreviewPage extends StatelessWidget {
       customerName: customerName,
       customerAddress: customerAddress,
       customerContact: customerContact,
+      customerEmail: customerEmail,
       items: items,
       totalAmount: totals['totalAmount']!,
       totalGstAmount: totals['totalGstAmount']!,

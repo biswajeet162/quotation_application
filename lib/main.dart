@@ -7,6 +7,7 @@ import 'pages/user_management_page.dart';
 import 'pages/password_reset_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/companies_page.dart';
+import 'pages/quotation_history_page.dart';
 import 'widgets/navigation_sidebar.dart';
 import 'widgets/page_header.dart';
 import 'services/auth_service.dart';
@@ -71,7 +72,7 @@ class _MainScreenState extends State<MainScreen> {
       const ProductsPage(),
       const PlaceholderPage(title: 'Dashboard'),
       const CreateQuotationPage(),
-      const PlaceholderPage(title: 'Quotation History'),
+      const QuotationHistoryPage(),
       const CompaniesPage(),
       SettingsPage(userEmail: authService.currentUser?.email ?? ''),
     ];

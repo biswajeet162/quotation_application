@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/product.dart';
 import '../models/quotation_item.dart';
 import '../models/company.dart';
+import '../models/quotation_history.dart';
 import '../database/database_helper.dart';
 import 'quotation_preview_page.dart';
 import '../widgets/page_header.dart';
@@ -266,6 +267,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         customerName: _customerNameController.text,
         customerAddress: _addressController.text,
         customerContact: _mobileController.text,
+        customerEmail: _emailController.text,
         items: validItems,
       ),
     );
@@ -297,6 +299,30 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       ),
     );
 
+    // Get valid items for quotation
+    final validItems = _items.where((item) => item.product != null).toList();
+    if (validItems.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please add at least one item to save'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Calculate totals
+    double totalAmount = 0;
+    double totalGstAmount = 0;
+    double grandTotal = 0;
+    for (var item in validItems) {
+      totalAmount += item.unitPrice;
+      totalGstAmount += item.gstAmount;
+      grandTotal += item.lineTotal;
+    }
+
     if (existingCompany.id == null) {
       // Company doesn't exist, create new one
       try {
@@ -311,14 +337,6 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         );
         // Reload companies list
         await _loadCompanies();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Company saved and quotation saved successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -330,13 +348,41 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         }
         return;
       }
-    } else {
-      // Company exists, just save quotation
+    }
+
+    // Save quotation to history
+    try {
+      final quotationHistory = QuotationHistory(
+        quotationNumber: _generateQuotationNumber(),
+        quotationDate: _selectedDate ?? DateTime.now(),
+        customerName: _customerNameController.text.trim(),
+        customerAddress: _addressController.text.trim(),
+        customerContact: _mobileController.text.trim(),
+        customerEmail: _emailController.text.trim(),
+        items: validItems,
+        totalAmount: totalAmount,
+        totalGstAmount: totalGstAmount,
+        grandTotal: grandTotal,
+        action: 'saved',
+        createdAt: DateTime.now(),
+      );
+
+      await _dbHelper.insertQuotationHistory(quotationHistory);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Quotation saved successfully'),
             backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving quotation: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
       }
