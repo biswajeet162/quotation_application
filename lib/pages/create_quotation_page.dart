@@ -4,6 +4,7 @@ import '../models/product.dart';
 import '../models/quotation_item.dart';
 import '../database/database_helper.dart';
 import 'quotation_preview_page.dart';
+import '../widgets/page_header.dart';
 
 class CreateQuotationPage extends StatefulWidget {
   final Function(bool)? onDataChanged;
@@ -254,103 +255,103 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[200],
-      body: SingleChildScrollView(
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
-          child: Card(
-            elevation: 2,
-            color: Colors.grey[50],
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  const Text(
-                    'Create Quotation',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+      body: Column(
+        children: [
+          const PageHeader(
+            title: 'Create Quotation',
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
+                child: Card(
+                  elevation: 2,
+                  color: Colors.grey[50],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        // Customer Details Section
+                        _buildCustomerDetailsSection(),
+                        const SizedBox(height: 24),
+                        // Item Details Section
+                        _buildItemDetailsSection(),
+                        const SizedBox(height: 20),
+                        // Add Item Button
+                        ElevatedButton.icon(
+                          onPressed: _addNewItem,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Item'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        // Action Buttons (Preview, Save)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: _previewQuotation,
+                              icon: const Icon(Icons.preview, color: Colors.white),
+                              label: const Text(
+                                'Preview',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton.icon(
+                              onPressed: _saveQuotation,
+                              icon: const Icon(Icons.save, color: Colors.white),
+                              label: const Text(
+                                'Save',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  // Customer Details Section
-                  _buildCustomerDetailsSection(),
-                  const SizedBox(height: 24),
-                  // Item Details Section
-                  _buildItemDetailsSection(),
-                  const SizedBox(height: 20),
-                  // Add Item Button
-                  ElevatedButton.icon(
-                    onPressed: _addNewItem,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add Item'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Action Buttons (Preview, Save)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: _previewQuotation,
-                        icon: const Icon(Icons.preview, color: Colors.white),
-                        label: const Text(
-                          'Preview',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: _saveQuotation,
-                        icon: const Icon(Icons.save, color: Colors.white),
-                        label: const Text(
-                          'Save',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

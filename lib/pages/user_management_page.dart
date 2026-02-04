@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../database/database_helper.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../widgets/page_header.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -479,17 +480,21 @@ class _UserManagementPageState extends State<UserManagementPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('User Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showCreateUserDialog,
-            tooltip: 'Create New User',
+      body: Column(
+        children: [
+          PageHeader(
+            title: 'User Management',
+            actionButton: IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: _showCreateUserDialog,
+              tooltip: 'Create New User',
+              style: IconButton.styleFrom(
+                padding: const EdgeInsets.all(12),
+              ),
+            ),
           ),
-        ],
-      ),
-      body: _isLoading
+          Expanded(
+            child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _users.isEmpty
               ? Center(
@@ -591,6 +596,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     );
                   },
                 ),
+          ),
+        ],
+      ),
     );
   }
 }

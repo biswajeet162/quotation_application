@@ -7,6 +7,7 @@ import 'pages/user_management_page.dart';
 import 'pages/password_reset_page.dart';
 import 'pages/settings_page.dart';
 import 'widgets/navigation_sidebar.dart';
+import 'widgets/page_header.dart';
 import 'services/auth_service.dart';
 
 void main() {
@@ -159,15 +160,22 @@ class PlaceholderPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey,
+      body: Column(
+        children: [
+          PageHeader(title: title),
+          Expanded(
+            child: Center(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
