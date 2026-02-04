@@ -45,7 +45,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -73,7 +73,11 @@ class DatabaseHelper {
         email $textType UNIQUE,
         password $textType,
         role $textType,
-        createdAt TEXT NOT NULL
+        name $textType,
+        mobileNumber $textType,
+        createdBy TEXT,
+        createdAt TEXT NOT NULL,
+        lastLoginTime TEXT
       )
     ''');
 
@@ -107,6 +111,52 @@ class DatabaseHelper {
         await _createDefaultAdmin(db);
       }
     }
+    if (oldVersion < 4) {
+      // Add new columns to users table
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN name TEXT NOT NULL DEFAULT ""');
+      } catch (e) {
+        // Column might already exist
+      }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN mobileNumber TEXT NOT NULL DEFAULT ""');
+      } catch (e) {
+        // Column might already exist
+      }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN createdBy TEXT');
+      } catch (e) {
+        // Column might already exist
+      }
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN lastLoginTime TEXT');
+      } catch (e) {
+        // Column might already exist
+      }
+      // Update all existing users to have default values for name and mobileNumber
+      final allUsers = await db.query('users');
+      for (var user in allUsers) {
+        final userId = user['id'] as int;
+        final email = user['email'] as String;
+        final updateData = <String, dynamic>{};
+        
+        if (user['name'] == null || (user['name'] as String?)?.isEmpty == true) {
+          updateData['name'] = email == 'admin@gmail.com' ? 'Administrator' : '';
+        }
+        if (user['mobileNumber'] == null || (user['mobileNumber'] as String?)?.isEmpty == true) {
+          updateData['mobileNumber'] = '';
+        }
+        
+        if (updateData.isNotEmpty) {
+          await db.update(
+            'users',
+            updateData,
+            where: 'id = ?',
+            whereArgs: [userId],
+          );
+        }
+      }
+    }
   }
 
   Future<void> _createDefaultAdmin(Database db) async {
@@ -116,7 +166,11 @@ class DatabaseHelper {
         'email': 'admin@gmail.com',
         'password': adminPassword,
         'role': 'admin',
+        'name': 'Administrator',
+        'mobileNumber': '',
+        'createdBy': null,
         'createdAt': DateTime.now().toIso8601String(),
+        'lastLoginTime': null,
       });
     } catch (e) {
       // Admin user might already exist, ignore error
@@ -193,7 +247,23 @@ class DatabaseHelper {
       return null;
     }
 
-    return User.fromMap(result.first);
+    // Update last login time
+    final userId = result.first['id'] as int;
+    await db.update(
+      'users',
+      {'lastLoginTime': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+
+    // Fetch updated user
+    final updatedResult = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+
+    return User.fromMap(updatedResult.first);
   }
 
   Future<User?> getUserByEmail(String email) async {
@@ -211,14 +281,25 @@ class DatabaseHelper {
     return User.fromMap(result.first);
   }
 
-  Future<int> createUser(String email, String password, String role) async {
+  Future<int> createUser(
+    String email,
+    String password,
+    String role,
+    String name,
+    String mobileNumber,
+    String? createdBy,
+  ) async {
     final db = await database;
     final hashedPassword = _hashPassword(password);
     return await db.insert('users', {
       'email': email,
       'password': hashedPassword,
       'role': role,
+      'name': name,
+      'mobileNumber': mobileNumber,
+      'createdBy': createdBy,
       'createdAt': DateTime.now().toIso8601String(),
+      'lastLoginTime': null,
     });
   }
 

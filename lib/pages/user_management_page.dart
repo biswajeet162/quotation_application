@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../database/database_helper.dart';
 import '../models/user.dart';
+import '../services/auth_service.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -33,7 +35,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   Future<void> _showCreateUserDialog() async {
     final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
     final emailController = TextEditingController();
+    final mobileController = TextEditingController();
     final passwordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     bool obscurePassword = true;
@@ -51,6 +55,22 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextFormField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Name',
+                      prefixIcon: Icon(Icons.person_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
                     controller: emailController,
                     decoration: const InputDecoration(
                       labelText: 'Email',
@@ -64,6 +84,22 @@ class _UserManagementPageState extends State<UserManagementPage> {
                       }
                       if (!value.contains('@')) {
                         return 'Please enter a valid email';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: mobileController,
+                    decoration: const InputDecoration(
+                      labelText: 'Mobile Number',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.phone,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter mobile number';
                       }
                       return null;
                     },
@@ -143,10 +179,15 @@ class _UserManagementPageState extends State<UserManagementPage> {
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   try {
+                    final authService = Provider.of<AuthService>(context, listen: false);
+                    final createdBy = authService.currentUser?.email;
                     await DatabaseHelper.instance.createUser(
                       emailController.text.trim(),
                       passwordController.text,
                       'user',
+                      nameController.text.trim(),
+                      mobileController.text.trim(),
+                      createdBy,
                     );
                     if (context.mounted) {
                       Navigator.of(context).pop();
@@ -177,7 +218,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
       ),
     );
 
+    nameController.dispose();
     emailController.dispose();
+    mobileController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
   }
@@ -356,6 +399,35 @@ class _UserManagementPageState extends State<UserManagementPage> {
     confirmPasswordController.dispose();
   }
 
+  Widget _buildInfoRow(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(color: Colors.grey[800]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
   Future<void> _deleteUser(User user) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -447,7 +519,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
                     final user = _users[index];
                     return Card(
                       margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
+                      child: ExpansionTile(
                         leading: CircleAvatar(
                           backgroundColor: user.isAdmin
                               ? Colors.blue
@@ -457,13 +529,19 @@ class _UserManagementPageState extends State<UserManagementPage> {
                             color: Colors.white,
                           ),
                         ),
-                        title: Text(user.email),
-                        subtitle: Text(
-                          'Role: ${user.role.toUpperCase()}',
-                          style: TextStyle(
-                            color: user.isAdmin ? Colors.blue : Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
+                        title: Text(user.name.isNotEmpty ? user.name : user.email),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(user.email),
+                            Text(
+                              'Role: ${user.role.toUpperCase()}',
+                              style: TextStyle(
+                                color: user.isAdmin ? Colors.blue : Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -482,6 +560,33 @@ class _UserManagementPageState extends State<UserManagementPage> {
                               ),
                           ],
                         ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (user.mobileNumber.isNotEmpty)
+                                  _buildInfoRow('Mobile', user.mobileNumber, Icons.phone),
+                                if (user.createdBy != null)
+                                  _buildInfoRow('Created By', user.createdBy!, Icons.person_add),
+                                _buildInfoRow(
+                                  'Created At',
+                                  _formatDate(user.createdAt),
+                                  Icons.calendar_today,
+                                ),
+                                if (user.lastLoginTime != null)
+                                  _buildInfoRow(
+                                    'Last Login',
+                                    _formatDate(user.lastLoginTime!),
+                                    Icons.access_time,
+                                  )
+                                else
+                                  _buildInfoRow('Last Login', 'Never', Icons.access_time),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },
