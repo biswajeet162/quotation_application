@@ -2,9 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/product.dart';
 import '../models/quotation_item.dart';
+import '../models/company.dart';
 import '../database/database_helper.dart';
 import 'quotation_preview_page.dart';
 import '../widgets/page_header.dart';
+
+// Wrapper class for autocomplete options
+class CompanyOption {
+  final Company? company;
+  final String? newCompanyName;
+
+  CompanyOption.existing(this.company) : newCompanyName = null;
+  CompanyOption.newCompany(this.newCompanyName) : company = null;
+
+  bool get isNew => company == null;
+  String get displayName => company?.name ?? newCompanyName ?? '';
+}
 
 class CreateQuotationPage extends StatefulWidget {
   final Function(bool)? onDataChanged;
@@ -22,21 +35,25 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _mobileController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   DateTime? _selectedDate;
   
   // Items List
   final List<QuotationItem> _items = [];
   List<Product> _products = [];
+  List<Company> _companies = [];
 
   @override
   void initState() {
     super.initState();
     _loadProducts();
+    _loadCompanies();
     _addNewItem();
     // Add listeners to text controllers
     _customerNameController.addListener(_onDataChanged);
     _addressController.addListener(_onDataChanged);
     _mobileController.addListener(_onDataChanged);
+    _emailController.addListener(_onDataChanged);
   }
 
   void _onDataChanged() {
@@ -51,6 +68,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     _customerNameController.dispose();
     _addressController.dispose();
     _mobileController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -59,6 +77,17 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       final products = await _dbHelper.getAllProducts();
       setState(() {
         _products = products;
+      });
+    } catch (e) {
+      // Handle error silently or show message
+    }
+  }
+
+  Future<void> _loadCompanies() async {
+    try {
+      final companies = await _dbHelper.getAllCompanies();
+      setState(() {
+        _companies = companies;
       });
     } catch (e) {
       // Handle error silently or show message
@@ -120,6 +149,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         _customerNameController.text.isNotEmpty ||
         _addressController.text.isNotEmpty ||
         _mobileController.text.isNotEmpty ||
+        _emailController.text.isNotEmpty ||
         _selectedDate != null;
   }
 
@@ -241,14 +271,85 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     );
   }
 
-  void _saveQuotation() {
-    // TODO: Implement quotation save
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Save functionality will be implemented'),
-        backgroundColor: Colors.green,
+  Future<void> _saveQuotation() async {
+    // Validate required fields
+    if (_customerNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter customer name'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Check if company exists, if not, save it
+    final companyName = _customerNameController.text.trim();
+    final existingCompany = _companies.firstWhere(
+      (company) => company.name.toLowerCase() == companyName.toLowerCase(),
+      orElse: () => Company(
+        id: null,
+        name: '',
+        address: '',
+        mobile: '',
+        email: '',
+        createdAt: DateTime.now(),
       ),
     );
+
+    if (existingCompany.id == null) {
+      // Company doesn't exist, create new one
+      try {
+        await _dbHelper.insertCompany(
+          Company(
+            name: companyName,
+            address: _addressController.text.trim(),
+            mobile: _mobileController.text.trim(),
+            email: _emailController.text.trim(),
+            createdAt: DateTime.now(),
+          ),
+        );
+        // Reload companies list
+        await _loadCompanies();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Company saved and quotation saved successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error saving company: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    } else {
+      // Company exists, just save quotation
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Quotation saved successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  void _onCompanySelected(Company company) {
+    setState(() {
+      _customerNameController.text = company.name;
+      _addressController.text = company.address;
+      _mobileController.text = company.mobile;
+      _emailController.text = company.email;
+    });
   }
 
   @override
@@ -371,19 +472,13 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         Row(
           children: [
             Expanded(
-              child: _buildTextField(
-                controller: _customerNameController,
-                label: 'Customer Name',
-                hint: 'Enter Customer Name',
-              ),
+              flex: 3,
+              child: _buildCompanyAutocomplete(),
             ),
             const SizedBox(width: 20),
             Expanded(
-              child: _buildTextField(
-                controller: _addressController,
-                label: 'Address',
-                hint: 'Enter Address',
-              ),
+              flex: 4,
+              child: _buildAddressField(),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -398,9 +493,201 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
             const SizedBox(width: 20),
             Expanded(
               flex: 2,
+              child: _buildTextField(
+                controller: _emailController,
+                label: 'Email',
+                hint: 'Enter Email Address',
+                keyboardType: TextInputType.emailAddress,
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              flex: 2,
               child: _buildDateField(),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompanyAutocomplete() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Company Name',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Autocomplete<CompanyOption>(
+          optionsBuilder: (TextEditingValue textEditingValue) {
+            final query = textEditingValue.text.trim().toLowerCase();
+            
+            // If empty, show all companies
+            if (query.isEmpty) {
+              return _companies
+                  .map((company) => CompanyOption.existing(company))
+                  .toList();
+            }
+            
+            // Filter companies by name
+            final matchingCompanies = _companies
+                .where((company) {
+                  return company.name.toLowerCase().contains(query);
+                })
+                .map((company) => CompanyOption.existing(company))
+                .toList();
+            
+            // If no matches found, show only "Add new" option
+            if (matchingCompanies.isEmpty) {
+              return [CompanyOption.newCompany(textEditingValue.text)];
+            }
+            
+            return matchingCompanies;
+          },
+          displayStringForOption: (CompanyOption option) {
+            return option.displayName;
+          },
+          fieldViewBuilder: (
+            BuildContext context,
+            TextEditingController textEditingController,
+            FocusNode focusNode,
+            VoidCallback onFieldSubmitted,
+          ) {
+            // Sync the autocomplete controller with our main controller
+            // Initialize on first build
+            if (textEditingController.text != _customerNameController.text) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (textEditingController.text != _customerNameController.text) {
+                  textEditingController.text = _customerNameController.text;
+                }
+              });
+            }
+            
+            // Update main controller when autocomplete field changes
+            textEditingController.addListener(() {
+              if (_customerNameController.text != textEditingController.text) {
+                _customerNameController.text = textEditingController.text;
+              }
+            });
+            
+            return TextField(
+              controller: textEditingController,
+              focusNode: focusNode,
+              decoration: InputDecoration(
+                hintText: 'Type company name...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+            );
+          },
+          onSelected: (CompanyOption option) {
+            if (option.isNew) {
+              // "Add new" was selected - keep the typed text
+              // Don't auto-fill other fields, user can enter manually
+              // The company will be saved when quotation is saved
+            } else {
+              // Existing company selected - auto-fill all fields
+              _onCompanySelected(option.company!);
+            }
+          },
+          optionsViewBuilder: (BuildContext context,
+              AutocompleteOnSelected<CompanyOption> onSelected,
+              Iterable<CompanyOption> options) {
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 4.0,
+                borderRadius: BorderRadius.circular(4),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final CompanyOption option = options.elementAt(index);
+                      if (option.isNew) {
+                        // "Add new" option
+                        return ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.add_circle, color: Colors.blue),
+                          title: Text(
+                            'Add new: ${option.newCompanyName}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          onTap: () {
+                            onSelected(option);
+                          },
+                        );
+                      } else {
+                        // Existing company option
+                        return ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.business, size: 20),
+                          title: Text(option.company!.name),
+                          subtitle: Text(
+                            option.company!.email,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onTap: () {
+                            onSelected(option);
+                          },
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAddressField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Address',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _addressController,
+          maxLines: 2,
+          minLines: 1,
+          textInputAction: TextInputAction.newline,
+          decoration: InputDecoration(
+            hintText: 'Enter Address',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+          style: const TextStyle(
+            height: 1.2,
+          ),
         ),
       ],
     );
@@ -546,7 +833,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           const SizedBox(width: 12),
           _buildHeaderCell('GST Amount', 100),
           const SizedBox(width: 12),
-          _buildHeaderCell('Delivery Date', 120),
+          _buildHeaderCell('Delivery Date', 130),
           const SizedBox(width: 12),
           _buildHeaderCell('Line Total', 100),
           const SizedBox(width: 12),
@@ -682,7 +969,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           ),
           const SizedBox(width: 12),
           _buildItemCell(
-            width: 120,
+            width: 140,
             child: _buildDeliveryDateField(index, item),
           ),
           const SizedBox(width: 12),
