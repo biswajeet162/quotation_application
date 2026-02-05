@@ -17,7 +17,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
   bool _isLoading = true;
   String _searchQuery = '';
   String _filterAction = 'all'; // 'all', 'download', 'email'
-  String _categorizationType = 'all'; // 'all', 'company', 'email', 'mobile'
+  String _categorizationType = 'all'; // 'all', 'company', 'email', 'mobile', 'date', 'creator'
 
   @override
   void initState() {
@@ -119,6 +119,14 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
               ? quotation.customerContact 
               : 'No Mobile';
           break;
+        case 'date':
+          key = DateFormat('dd-MM-yyyy').format(quotation.createdAt);
+          break;
+        case 'creator':
+          key = quotation.createdBy.isNotEmpty 
+              ? quotation.createdBy 
+              : 'Unknown';
+          break;
         default:
           key = 'All';
       }
@@ -129,8 +137,25 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
       grouped[key]!.add(quotation);
     }
 
-    // Sort groups alphabetically, but keep quotations within each group sorted by date (descending)
-    final sortedKeys = grouped.keys.toList()..sort();
+    // Sort groups based on categorization type
+    List<String> sortedKeys;
+    if (_categorizationType == 'date') {
+      // For date, sort by date (newest first)
+      sortedKeys = grouped.keys.toList();
+      sortedKeys.sort((a, b) {
+        try {
+          final dateA = DateFormat('dd-MM-yyyy').parse(a);
+          final dateB = DateFormat('dd-MM-yyyy').parse(b);
+          return dateB.compareTo(dateA); // Descending (newest first)
+        } catch (e) {
+          return a.compareTo(b); // Fallback to alphabetical if parsing fails
+        }
+      });
+    } else {
+      // For other categories, sort alphabetically
+      sortedKeys = grouped.keys.toList()..sort();
+    }
+    
     final sortedGrouped = <String, List<QuotationHistory>>{};
     for (var key in sortedKeys) {
       // Ensure quotations within each group are sorted by date (descending)
@@ -240,7 +265,11 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                           ? Icons.business
                           : _categorizationType == 'email'
                               ? Icons.email
-                              : Icons.phone,
+                              : _categorizationType == 'mobile'
+                                  ? Icons.phone
+                                  : _categorizationType == 'date'
+                                      ? Icons.calendar_today
+                                      : Icons.person,
                       color: Colors.blue[700],
                       size: 20,
                     ),
@@ -388,6 +417,15 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                               color: Colors.grey[600],
                             ),
                           ),
+                        // Show date only if not categorizing by date
+                        if (_categorizationType == 'date')
+                          Text(
+                            'Company: ${quotation.customerName}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -429,25 +467,28 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                             color: Colors.grey[600],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.person_outline,
-                              size: 14,
-                              color: Colors.grey[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Created by: ${quotation.createdBy}',
-                              style: TextStyle(
-                                fontSize: 12,
+                        // Show creator only if not categorizing by creator
+                        if (_categorizationType != 'creator') ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 14,
                                 color: Colors.grey[600],
-                                fontStyle: FontStyle.italic,
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Created by: ${quotation.createdBy}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -550,6 +591,8 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                       DropdownMenuItem(value: 'company', child: Text('By Company')),
                       DropdownMenuItem(value: 'email', child: Text('By Email')),
                       DropdownMenuItem(value: 'mobile', child: Text('By Mobile Number')),
+                      DropdownMenuItem(value: 'date', child: Text('By Date')),
+                      DropdownMenuItem(value: 'creator', child: Text('By Creator')),
                     ],
                     onChanged: (value) {
                       setState(() {
