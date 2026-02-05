@@ -24,7 +24,7 @@ class _ProductsPageState extends State<ProductsPage> {
   List<Product> _allProducts = [];
   List<Product> _filteredProducts = [];
   bool _isLoading = false;
-  String _sortColumn = 'itemNumber';
+  String _sortColumn = 'designation';
   bool _sortAscending = true;
 
   @override
@@ -270,7 +270,7 @@ class _ProductsPageState extends State<ProductsPage> {
           ),
           // Search Bar
           AppSearchBar(
-            hintText: 'Search by Item Number, Name, Rate, Description, or HSN Code',
+            hintText: 'Search by Designation, Group, Quantity, RSP, or Information',
             controller: _searchController,
           ),
           const SizedBox(height: 16),

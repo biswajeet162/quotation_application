@@ -395,7 +395,7 @@ class QuotationPreviewPage extends StatelessWidget {
                                         children: [
                                           _buildDataCell('${index + 1}', colWidths['sno']!),
                                           _buildDataCell(
-                                            item.product?.itemName ?? '',
+                                            item.product?.information ?? '',
                                             colWidths['item']!,
                                             fontWeight: FontWeight.w500,
                                           ),

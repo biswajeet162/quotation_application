@@ -374,7 +374,7 @@ class PdfService {
                 children: [
                   _buildPdfCell('${index + 1}'),
                   _buildPdfCell(
-                    item.product?.itemName ?? '',
+                    item.product?.information ?? '',
                     fontWeight: pw.FontWeight.bold,
                   ),
                   _buildPdfCell(item.hsnCode),

@@ -80,46 +80,46 @@ class ProductsTable extends StatelessWidget {
       ),
       child: Table(
         columnWidths: const {
-          0: FlexColumnWidth(1.2),
-          1: FlexColumnWidth(2.0),
+          0: FlexColumnWidth(1.0),
+          1: FlexColumnWidth(1.8),
           2: FlexColumnWidth(1.0),
-          3: FlexColumnWidth(2.5),
-          4: FlexColumnWidth(1.0),
+          3: FlexColumnWidth(1.2),
+          4: FlexColumnWidth(2.5),
         },
         children: [
           TableRow(
             children: [
               _SortableHeaderCell(
-                text: 'Item Number',
-                columnKey: 'itemNumber',
+                text: 'Designation',
+                columnKey: 'designation',
                 sortColumn: sortColumn,
                 sortAscending: sortAscending,
                 onSort: onSort,
               ),
               _SortableHeaderCell(
-                text: 'Item Name',
-                columnKey: 'itemName',
+                text: 'Group',
+                columnKey: 'group',
                 sortColumn: sortColumn,
                 sortAscending: sortAscending,
                 onSort: onSort,
               ),
               _SortableHeaderCell(
-                text: 'Rate',
-                columnKey: 'rate',
+                text: 'Quantity',
+                columnKey: 'quantity',
                 sortColumn: sortColumn,
                 sortAscending: sortAscending,
                 onSort: onSort,
               ),
               _SortableHeaderCell(
-                text: 'Description',
-                columnKey: 'description',
+                text: 'RSP',
+                columnKey: 'rsp',
                 sortColumn: sortColumn,
                 sortAscending: sortAscending,
                 onSort: onSort,
               ),
               _SortableHeaderCell(
-                text: 'HSN Code',
-                columnKey: 'hsnCode',
+                text: 'Information',
+                columnKey: 'information',
                 sortColumn: sortColumn,
                 sortAscending: sortAscending,
                 onSort: onSort,
@@ -233,30 +233,34 @@ class _ProductTableRowState extends State<_ProductTableRow> {
         ),
         child: Table(
           columnWidths: const {
-            0: FlexColumnWidth(1.2),
-            1: FlexColumnWidth(2.0),
+            0: FlexColumnWidth(1.0),
+            1: FlexColumnWidth(1.8),
             2: FlexColumnWidth(1.0),
-            3: FlexColumnWidth(2.5),
-            4: FlexColumnWidth(1.0),
+            3: FlexColumnWidth(1.2),
+            4: FlexColumnWidth(2.5),
           },
           children: [
             TableRow(
               children: [
                 _TableCell(
-                  text: widget.product.itemNumber,
+                  text: widget.product.designation,
                   fontWeight: FontWeight.w500,
                 ),
-                _TableCell(text: widget.product.itemName),
+                _TableCell(text: widget.product.group),
                 _TableCell(
-                  text: '₹${widget.product.rate.toStringAsFixed(2)}',
+                  text: widget.product.quantity.toStringAsFixed(2),
                   color: Colors.green,
                   fontWeight: FontWeight.bold,
                 ),
                 _TableCell(
-                  text: widget.product.description,
+                  text: '₹${widget.product.rsp.toStringAsFixed(2)}',
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+                _TableCell(
+                  text: widget.product.information,
                   maxLines: 2,
                 ),
-                _TableCell(text: widget.product.hsnCode),
               ],
             ),
           ],

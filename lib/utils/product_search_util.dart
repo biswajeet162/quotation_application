@@ -14,31 +14,47 @@ class ProductSearchUtil {
     final searchQuery = query.toLowerCase().trim();
 
     return products.where((product) {
-      // Search in Item Number (as string and number)
-      if (product.itemNumber.toLowerCase().contains(searchQuery) ||
-          product.itemNumberAsInt.toString().contains(searchQuery)) {
+      // Search in Designation (number)
+      if (product.designation.toString().contains(searchQuery) ||
+          product.designationAsInt.toString().contains(searchQuery)) {
         return true;
       }
 
-      // Search in Item Name
-      if (product.itemName.toLowerCase().contains(searchQuery)) {
+      // Search in Group
+      if (product.group.toLowerCase().contains(searchQuery)) {
         return true;
       }
 
-      // Search in Rate (as string and number)
-      if (product.rate.toString().contains(searchQuery) ||
-          product.rate.toStringAsFixed(2).contains(searchQuery)) {
+      // Search in Quantity
+      if (product.quantity.toString().contains(searchQuery)) {
         return true;
       }
 
-      // Search in Description
-      if (product.description.toLowerCase().contains(searchQuery)) {
+      // Search in RSP
+      if (product.rsp.toString().contains(searchQuery) ||
+          product.rsp.toStringAsFixed(2).contains(searchQuery)) {
         return true;
       }
 
-      // Search in HSN Code (as string and number)
-      if (product.hsnCode.toLowerCase().contains(searchQuery) ||
-          product.hsnCodeAsInt.toString().contains(searchQuery)) {
+      // Search in Total Line Gross Weight
+      if (product.totalLineGrossWeight
+          .toString()
+          .contains(searchQuery)) {
+        return true;
+      }
+
+      // Search in Pack Quantity
+      if (product.packQuantity.toString().contains(searchQuery)) {
+        return true;
+      }
+
+      // Search in Pack Volume
+      if (product.packVolume.toString().contains(searchQuery)) {
+        return true;
+      }
+
+      // Search in Information
+      if (product.information.toLowerCase().contains(searchQuery)) {
         return true;
       }
 

@@ -48,7 +48,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 7,
+      version: 9,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -62,11 +62,14 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE products (
         id $idType,
-        itemNumber $textType,
-        itemName $textType,
-        rate $realType,
-        description $textType,
-        hsnCode $textType
+        designation $textType,
+        groupName $textType,
+        quantity $realType,
+        rsp $realType,
+        totalLineGrossWeight $realType,
+        packQuantity INTEGER NOT NULL,
+        packVolume $realType,
+        information $textType
       )
     ''');
 
@@ -123,8 +126,14 @@ class DatabaseHelper {
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      // Add itemNumber column to existing database
-      await db.execute('ALTER TABLE products ADD COLUMN itemNumber TEXT NOT NULL DEFAULT ""');
+      // Legacy: previously added itemNumber column – kept for backward compatibility
+      try {
+        await db.execute(
+          'ALTER TABLE products ADD COLUMN itemNumber TEXT NOT NULL DEFAULT ""',
+        );
+      } catch (e) {
+        // Column might already exist
+      }
     }
     if (oldVersion < 3) {
       // Add users table
@@ -246,6 +255,112 @@ class DatabaseHelper {
         debugPrint('Error adding createdBy column: $e');
       }
     }
+
+    // Version 8: migrate products table to new schema (designation, group, etc.)
+    if (oldVersion < 8) {
+      try {
+        // Create new table with desired structure
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS products_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            designation INTEGER NOT NULL,
+            groupName TEXT NOT NULL,
+            quantity REAL NOT NULL,
+            rsp REAL NOT NULL,
+            totalLineGrossWeight REAL NOT NULL,
+            packQuantity INTEGER NOT NULL,
+            packVolume REAL NOT NULL,
+            information TEXT NOT NULL
+          )
+        ''');
+
+        // Try to migrate existing data as best-effort (map old rate/description/hsnCode)
+        final hasOldColumns = await db
+            .rawQuery('PRAGMA table_info(products)')
+            .then((cols) => cols.any((c) => c['name'] == 'itemName'));
+
+        if (hasOldColumns) {
+          final oldProducts = await db.query('products');
+          for (final p in oldProducts) {
+            final designation =
+                int.tryParse((p['itemNumber'] ?? '0').toString()) ?? 0;
+            final groupName = ''; // no direct mapping from old schema
+            final quantity = 0.0;
+            final rsp = (p['rate'] as num?)?.toDouble() ?? 0.0;
+            final totalLineGrossWeight = 0.0;
+            final packQuantity = 0;
+            final packVolume = 0.0;
+            final information = (p['itemName'] ?? '').toString();
+
+            await db.insert('products_new', {
+              'designation': designation,
+              'groupName': groupName,
+              'quantity': quantity,
+              'rsp': rsp,
+              'totalLineGrossWeight': totalLineGrossWeight,
+              'packQuantity': packQuantity,
+              'packVolume': packVolume,
+              'information': information,
+            });
+          }
+        }
+
+        // Replace old table
+        await db.execute('DROP TABLE IF EXISTS products');
+        await db.execute('ALTER TABLE products_new RENAME TO products');
+      } catch (e) {
+        debugPrint('Error migrating products table to new schema: $e');
+      }
+    }
+
+    // Version 9: Convert designation column from INTEGER to TEXT
+    if (oldVersion < 9) {
+      try {
+        // Check current column type
+        final tableInfo = await db.rawQuery('PRAGMA table_info(products)');
+        final designationColumn = tableInfo.firstWhere(
+          (col) => col['name'] == 'designation',
+          orElse: () => {},
+        );
+        
+        // If designation is INTEGER, we need to convert it to TEXT
+        if (designationColumn.isNotEmpty && designationColumn['type'] == 'INTEGER') {
+          // Create new table with TEXT designation
+          await db.execute('''
+            CREATE TABLE products_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              designation TEXT NOT NULL,
+              groupName TEXT NOT NULL,
+              quantity REAL NOT NULL,
+              rsp REAL NOT NULL,
+              totalLineGrossWeight REAL NOT NULL,
+              packQuantity INTEGER NOT NULL,
+              packVolume REAL NOT NULL,
+              information TEXT NOT NULL
+            )
+          ''');
+          
+          // Copy data, converting designation from int to string
+          await db.execute('''
+            INSERT INTO products_new 
+            SELECT id, 
+                   CAST(designation AS TEXT) as designation,
+                   groupName, quantity, rsp, totalLineGrossWeight, 
+                   packQuantity, packVolume, information
+            FROM products
+          ''');
+          
+          // Drop old table
+          await db.execute('DROP TABLE products');
+          
+          // Rename new table
+          await db.execute('ALTER TABLE products_new RENAME TO products');
+        }
+      } catch (e) {
+        debugPrint('Error migrating designation column to TEXT: $e');
+        // If migration fails, the fromMap will handle conversion
+      }
+    }
   }
 
   Future<void> _createDefaultAdmin(Database db) async {
@@ -333,10 +448,10 @@ class DatabaseHelper {
 
   Future<List<Product>> getAllProducts() async {
     final db = await database;
-    // Sort by itemNumber numerically using CAST
-    final result = await db.query(
-      'products',
-      orderBy: 'CAST(itemNumber AS INTEGER) ASC',
+    // Query with explicit CAST to ensure designation is always returned as TEXT
+    // This handles cases where old INTEGER values might still exist
+    final result = await db.rawQuery(
+      'SELECT id, CAST(designation AS TEXT) as designation, groupName, quantity, rsp, totalLineGrossWeight, packQuantity, packVolume, information FROM products ORDER BY designation ASC',
     );
     return result.map((map) => Product.fromMap(map)).toList();
   }

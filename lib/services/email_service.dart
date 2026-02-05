@@ -207,7 +207,7 @@ class EmailService {
       final row = _buildTableRow(
         [
           '${i + 1}',
-          item.product?.itemName ?? '',
+          item.product?.information ?? '',
           item.hsnCode,
           item.qty.toStringAsFixed(0),
           '₹${item.rsp.toStringAsFixed(2)}',

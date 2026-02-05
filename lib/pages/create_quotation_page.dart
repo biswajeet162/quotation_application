@@ -161,8 +161,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       final item = _items[itemIndex];
       item.product = product;
       if (product != null) {
-        item.hsnCode = product.hsnCode;
-        item.rsp = product.rate;
+        // Use designation as HSN-like code for now (no dedicated HSN in new model)
+        item.hsnCode = product.designation.toString();
+        item.rsp = product.rsp;
         // Set qty to 1 when item is selected
         if (item.qty == 0) {
           item.qty = 1;
@@ -1111,7 +1112,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           return Align(
             alignment: Alignment.center,
             child: Text(
-              product.itemName,
+              product.information,
               style: const TextStyle(
                 fontSize: 14,
                 color: Colors.black87,
@@ -1134,7 +1135,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        product.itemName,
+                        product.information,
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black87,
@@ -1144,7 +1145,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'HSN: ${product.hsnCode} | Rate: ₹${product.rate.toStringAsFixed(2)}',
+                        'Designation: ${product.designation} | RSP: ₹${product.rsp.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],

@@ -40,7 +40,7 @@ class QuotationHistory {
     final itemsJson = items.map((item) {
       return {
         'productId': item.product?.id,
-        'productName': item.product?.itemName ?? '',
+        'productName': item.product?.information ?? '',
         'hsnCode': item.hsnCode,
         'qty': item.qty,
         'rsp': item.rsp,
@@ -83,11 +83,14 @@ class QuotationHistory {
         final product = productName.isNotEmpty
             ? Product(
                 id: itemMap['productId'] as int?,
-                itemNumber: '',
-                itemName: productName,
-                rate: 0,
-                description: '',
-                hsnCode: itemMap['hsnCode'] as String? ?? '',
+                designation: '',
+                group: '',
+                quantity: 0,
+                rsp: 0,
+                totalLineGrossWeight: 0,
+                packQuantity: 0,
+                packVolume: 0,
+                information: productName,
               )
             : null;
 

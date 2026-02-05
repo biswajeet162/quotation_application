@@ -10,23 +10,30 @@ class ProductSortUtil {
     products.sort((a, b) {
       int comparison = 0;
       switch (sortColumn) {
-        case 'itemNumber':
-          // Sort as integer
-          comparison = a.itemNumberAsInt.compareTo(b.itemNumberAsInt);
+        case 'designation':
+          comparison = a.designationAsInt.compareTo(b.designationAsInt);
           break;
-        case 'itemName':
-          comparison = a.itemName.compareTo(b.itemName);
+        case 'group':
+          comparison = a.group.compareTo(b.group);
           break;
-        case 'rate':
-          // Sort as number
-          comparison = a.rate.compareTo(b.rate);
+        case 'quantity':
+          comparison = a.quantity.compareTo(b.quantity);
           break;
-        case 'description':
-          comparison = a.description.compareTo(b.description);
+        case 'rsp':
+          comparison = a.rsp.compareTo(b.rsp);
           break;
-        case 'hsnCode':
-          // Sort as integer
-          comparison = a.hsnCodeAsInt.compareTo(b.hsnCodeAsInt);
+        case 'totalLineGrossWeight':
+          comparison =
+              a.totalLineGrossWeight.compareTo(b.totalLineGrossWeight);
+          break;
+        case 'packQuantity':
+          comparison = a.packQuantity.compareTo(b.packQuantity);
+          break;
+        case 'packVolume':
+          comparison = a.packVolume.compareTo(b.packVolume);
+          break;
+        case 'information':
+          comparison = a.information.compareTo(b.information);
           break;
         default:
           comparison = 0;
