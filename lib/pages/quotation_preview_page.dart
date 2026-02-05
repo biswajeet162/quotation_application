@@ -233,18 +233,28 @@ class QuotationPreviewPage extends StatelessWidget {
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
                                         ),
                                       ),
-                                      SizedBox(height: 4),
+                                      SizedBox(height: 6),
                                       Text(
-                                        '2, Ring Rd, Awas Vikas, Rudrapur, Jagatpura, Uttarakhand 263153',
+                                        '2, Ring Rd, Awas Vikas,',
                                         style: TextStyle(fontSize: 11),
                                       ),
-                                      SizedBox(height: 4),
+                                      Text(
+                                        'Rudrapur, Jagatpura,',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      Text(
+                                        'Uttarakhand 263153',
+                                        style: TextStyle(fontSize: 11),
+                                      ),
+                                      SizedBox(height: 6),
                                       Text(
                                         'GSTIN No.: XXXXXXX XXXXXXXX',
                                         style: TextStyle(fontSize: 11),
                                       ),
+                                      SizedBox(height: 2),
                                       Text(
                                         'PAN No.: XXXXX XXXXXX',
                                         style: TextStyle(fontSize: 11),
@@ -559,4 +569,5 @@ class QuotationPreviewPage extends StatelessWidget {
     );
   }
 }
+
 
