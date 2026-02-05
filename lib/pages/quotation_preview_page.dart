@@ -140,27 +140,28 @@ class QuotationPreviewPage extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      ElevatedButton.icon(
-                        onPressed: () => _emailQuotation(context),
-                        icon: const Icon(Icons.email, color: Colors.white, size: 16),
-                        label: const Text(
-                          'Email',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                        ),
-                      ),
+                      // Email button hidden for now
+                      // const SizedBox(width: 8),
+                      // ElevatedButton.icon(
+                      //   onPressed: () => _emailQuotation(context),
+                      //   icon: const Icon(Icons.email, color: Colors.white, size: 16),
+                      //   label: const Text(
+                      //     'Email',
+                      //     style: TextStyle(
+                      //       color: Colors.white,
+                      //       fontSize: 12,
+                      //       fontWeight: FontWeight.bold,
+                      //     ),
+                      //   ),
+                      //   style: ElevatedButton.styleFrom(
+                      //     backgroundColor: Colors.orange,
+                      //     foregroundColor: Colors.white,
+                      //     padding: const EdgeInsets.symmetric(
+                      //       horizontal: 12,
+                      //       vertical: 6,
+                      //     ),
+                      //   ),
+                      // ),
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.close, color: Colors.white),
@@ -489,11 +490,6 @@ class QuotationPreviewPage extends StatelessWidget {
                       SizedBox(height: 6),
                       Text(
                         'Taxes amounting 18% of the total value will be included in the invoice',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Lorem Ipsum Doler Sit Amet',
                         style: TextStyle(fontSize: 11),
                       ),
                     ],

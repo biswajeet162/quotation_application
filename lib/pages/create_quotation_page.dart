@@ -186,6 +186,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     setState(() {
       final item = _items[index];
       switch (field) {
+        case 'hsnCode':
+          item.hsnCode = value.toString();
+          break;
         case 'qty':
           item.qty = double.tryParse(value.toString()) ?? 0;
           break;
@@ -946,13 +949,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           const SizedBox(width: 12),
           _buildItemCell(
             width: 100,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                item.hsnCode,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14),
-              ),
+            child: _buildTextInputField(
+              value: item.hsnCode,
+              onChanged: (value) => _updateItemValue(index, 'hsnCode', value),
             ),
           ),
           const SizedBox(width: 12),
@@ -1069,8 +1068,165 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   }
 
   Widget _buildProductDropdown(int itemIndex, QuotationItem item) {
-    return DropdownButtonFormField<Product>(
-      value: item.product,
+    // Use a key to ensure the autocomplete rebuilds when product changes
+    return Autocomplete<Product>(
+      key: ValueKey('product_${itemIndex}_${item.product?.id ?? 'none'}'),
+      displayStringForOption: (Product product) => product.information,
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        final query = textEditingValue.text.trim().toLowerCase();
+        
+        // If empty, return all products
+        if (query.isEmpty) {
+          return _products;
+        }
+        
+        // Filter products based on group, price (RSP), and information
+        return _products.where((product) {
+          // Search in group
+          if (product.group.toLowerCase().contains(query)) {
+            return true;
+          }
+          
+          // Search in price (RSP) - check both formatted and raw values
+          final rspString = product.rsp.toString();
+          final rspFormatted = product.rsp.toStringAsFixed(2);
+          if (rspString.contains(query) || rspFormatted.contains(query)) {
+            return true;
+          }
+          
+          // Search in information
+          if (product.information.toLowerCase().contains(query)) {
+            return true;
+          }
+          
+          return false;
+        });
+      },
+      fieldViewBuilder: (
+        BuildContext context,
+        TextEditingController textEditingController,
+        FocusNode focusNode,
+        VoidCallback onFieldSubmitted,
+      ) {
+        // Initialize with selected product's information if available
+        final currentProduct = item.product;
+        if (currentProduct != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (currentProduct == item.product && 
+                textEditingController.text != currentProduct.information) {
+              textEditingController.text = currentProduct.information;
+            }
+          });
+        }
+        
+        return TextField(
+          controller: textEditingController,
+          focusNode: focusNode,
+          decoration: InputDecoration(
+            hintText: 'Type to search item...',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: Colors.grey[400]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: Colors.grey[400]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(color: Colors.blue[700]!, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            isDense: true,
+          ),
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black87,
+          ),
+          textAlign: TextAlign.center,
+        );
+      },
+      onSelected: (Product product) {
+        _onProductSelected(itemIndex, product);
+      },
+      optionsViewBuilder: (BuildContext context,
+          AutocompleteOnSelected<Product> onSelected,
+          Iterable<Product> options) {
+        if (options.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4.0,
+            borderRadius: BorderRadius.circular(4),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 300),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final Product product = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.inventory_2, size: 20),
+                    title: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Group: ${product.group}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Designation: ${product.designation}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Price: ₹${product.rsp.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    onTap: () {
+                      onSelected(product);
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNumberField({
+    required String value,
+    required Function(String) onChanged,
+  }) {
+    return TextField(
+      controller: TextEditingController(text: value),
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontSize: 14, color: Colors.black87),
       decoration: InputDecoration(
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(4),
@@ -1092,85 +1248,17 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         ),
         isDense: true,
       ),
-      hint: const Text(
-        'Select Item',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 14, color: Colors.grey),
-      ),
-      isExpanded: true,
-      style: const TextStyle(
-        fontSize: 14,
-        color: Colors.black87,
-      ),
-      alignment: Alignment.center,
-      dropdownColor: Colors.white,
-      menuMaxHeight: 400,
-      icon: const Icon(Icons.arrow_drop_down, color: Colors.black87),
-      selectedItemBuilder: (BuildContext context) {
-        // Show only item name when selected
-        return _products.map((product) {
-          return Align(
-            alignment: Alignment.center,
-            child: Text(
-              product.information,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.black87,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          );
-        }).toList();
-      },
-      items: _products.map((product) {
-        return DropdownMenuItem<Product>(
-          value: product,
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        product.information,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Designation: ${product.designation} | RSP: ₹${product.rsp.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-      onChanged: (product) => _onProductSelected(itemIndex, product),
+      onChanged: onChanged,
     );
   }
 
-  Widget _buildNumberField({
+  Widget _buildTextInputField({
     required String value,
     required Function(String) onChanged,
   }) {
     return TextField(
       controller: TextEditingController(text: value),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      keyboardType: TextInputType.text,
       textAlign: TextAlign.center,
       style: const TextStyle(fontSize: 14, color: Colors.black87),
       decoration: InputDecoration(
