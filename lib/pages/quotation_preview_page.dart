@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/quotation_item.dart';
 import '../services/pdf_service.dart';
-import '../services/email_service.dart';
+// import '../services/email_service.dart'; // Email feature commented out for now
 import '../database/database_helper.dart';
 
 class QuotationPreviewPage extends StatelessWidget {
@@ -76,37 +76,38 @@ class QuotationPreviewPage extends StatelessWidget {
     }
   }
 
-  Future<void> _emailQuotation(BuildContext context) async {
-    final totals = _calculateTotals();
-    await EmailService.sendQuotationEmail(
-      context: context,
-      quotationNumber: quotationNumber,
-      quotationDate: quotationDate,
-      customerName: customerName,
-      customerAddress: customerAddress,
-      customerContact: customerContact,
-      customerEmail: customerEmail,
-      items: items,
-      totalAmount: totals['totalAmount']!,
-      totalGstAmount: totals['totalGstAmount']!,
-      grandTotal: totals['grandTotal']!,
-      quotationId: quotationId, // Pass ID to prevent duplicate insertion
-    );
-    
-    // If this is a saved quotation from history, update its action to "email" and update timestamp
-    if (quotationId != null) {
-      try {
-        await DatabaseHelper.instance.updateQuotationHistoryAction(
-          quotationId!,
-          'email',
-          updatedAt: DateTime.now(), // Update to current time when emailed
-        );
-      } catch (e) {
-        // Log error but don't show to user as email was already sent
-        debugPrint('Error updating quotation action: $e');
-      }
-    }
-  }
+  // Email feature commented out for now
+  // Future<void> _emailQuotation(BuildContext context) async {
+  //   final totals = _calculateTotals();
+  //   await EmailService.sendQuotationEmail(
+  //     context: context,
+  //     quotationNumber: quotationNumber,
+  //     quotationDate: quotationDate,
+  //     customerName: customerName,
+  //     customerAddress: customerAddress,
+  //     customerContact: customerContact,
+  //     customerEmail: customerEmail,
+  //     items: items,
+  //     totalAmount: totals['totalAmount']!,
+  //     totalGstAmount: totals['totalGstAmount']!,
+  //     grandTotal: totals['grandTotal']!,
+  //     quotationId: quotationId, // Pass ID to prevent duplicate insertion
+  //   );
+  //   
+  //   // If this is a saved quotation from history, update its action to "email" and update timestamp
+  //   if (quotationId != null) {
+  //     try {
+  //       await DatabaseHelper.instance.updateQuotationHistoryAction(
+  //         quotationId!,
+  //         'email',
+  //         updatedAt: DateTime.now(), // Update to current time when emailed
+  //       );
+  //     } catch (e) {
+  //       // Log error but don't show to user as email was already sent
+  //       debugPrint('Error updating quotation action: $e');
+  //     }
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {

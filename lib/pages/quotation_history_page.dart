@@ -16,8 +16,8 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
   List<QuotationHistory> _quotations = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String _filterAction = 'all'; // 'all', 'download', 'email'
-  String _categorizationType = 'all'; // 'all', 'company', 'email', 'mobile', 'date', 'creator'
+  String _filterAction = 'all'; // 'all', 'download' // 'email' commented out for now
+  String _categorizationType = 'all'; // 'all', 'company', 'mobile', 'date', 'creator' // 'email' commented out for now
 
   @override
   void initState() {
@@ -109,11 +109,12 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
               ? quotation.customerName 
               : 'Unknown Company';
           break;
-        case 'email':
-          key = quotation.customerEmail.isNotEmpty 
-              ? quotation.customerEmail 
-              : 'No Email';
-          break;
+        // Email categorization commented out for now
+        // case 'email':
+        //   key = quotation.customerEmail.isNotEmpty 
+        //       ? quotation.customerEmail 
+        //       : 'No Email';
+        //   break;
         case 'mobile':
           key = quotation.customerContact.isNotEmpty 
               ? quotation.customerContact 
@@ -267,13 +268,13 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                     Icon(
                       _categorizationType == 'company'
                           ? Icons.business
-                          : _categorizationType == 'email'
-                              ? Icons.email
-                              : _categorizationType == 'mobile'
-                                  ? Icons.phone
-                                  : _categorizationType == 'date'
-                                      ? Icons.calendar_today
-                                      : Icons.person,
+                          // : _categorizationType == 'email'
+                          //     ? Icons.email
+                          : _categorizationType == 'mobile'
+                              ? Icons.phone
+                              : _categorizationType == 'date'
+                                  ? Icons.calendar_today
+                                  : Icons.person,
                       color: Colors.blue[700],
                       size: 20,
                     ),
@@ -348,9 +349,9 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                               decoration: BoxDecoration(
                                 color: quotation.action == 'download'
                                     ? Colors.blue[100]
-                                    : quotation.action == 'email'
-                                        ? Colors.orange[100]
-                                        : Colors.green[100],
+                                    // : quotation.action == 'email'
+                                    //     ? Colors.orange[100]
+                                    : Colors.green[100],
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Row(
@@ -359,31 +360,31 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                                   Icon(
                                     quotation.action == 'download'
                                         ? Icons.download
-                                        : quotation.action == 'email'
-                                            ? Icons.email
-                                            : Icons.save,
+                                        // : quotation.action == 'email'
+                                        //     ? Icons.email
+                                        : Icons.save,
                                     size: 14,
                                     color: quotation.action == 'download'
                                         ? Colors.blue[700]
-                                        : quotation.action == 'email'
-                                            ? Colors.orange[700]
-                                            : Colors.green[700],
+                                        // : quotation.action == 'email'
+                                        //     ? Colors.orange[700]
+                                        : Colors.green[700],
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     quotation.action == 'download'
                                         ? 'Downloaded'
-                                        : quotation.action == 'email'
-                                            ? 'Emailed'
-                                            : 'Saved',
+                                        // : quotation.action == 'email'
+                                        //     ? 'Emailed'
+                                        : 'Saved',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       color: quotation.action == 'download'
                                           ? Colors.blue[700]
-                                          : quotation.action == 'email'
-                                              ? Colors.orange[700]
-                                              : Colors.green[700],
+                                          // : quotation.action == 'email'
+                                          //     ? Colors.orange[700]
+                                          : Colors.green[700],
                                     ),
                                   ),
                                 ],
@@ -401,16 +402,17 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
+                        // Email display commented out for now
                         // Show email only if not categorizing by email
-                        if (_categorizationType != 'email' &&
-                            quotation.customerEmail.isNotEmpty)
-                          Text(
-                            quotation.customerEmail,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
+                        // if (_categorizationType != 'email' &&
+                        //     quotation.customerEmail.isNotEmpty)
+                        //   Text(
+                        //     quotation.customerEmail,
+                        //     style: TextStyle(
+                        //       fontSize: 14,
+                        //       color: Colors.grey[600],
+                        //     ),
+                        //   ),
                         // Show mobile only if not categorizing by mobile
                         if (_categorizationType != 'mobile' &&
                             quotation.customerContact.isNotEmpty)
@@ -568,7 +570,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('All Actions')),
                       DropdownMenuItem(value: 'download', child: Text('Downloaded')),
-                      DropdownMenuItem(value: 'email', child: Text('Emailed')),
+                      // DropdownMenuItem(value: 'email', child: Text('Emailed')), // Email feature commented out for now
                       DropdownMenuItem(value: 'saved', child: Text('Saved')),
                     ],
                     onChanged: (value) {
@@ -593,7 +595,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('All')),
                       DropdownMenuItem(value: 'company', child: Text('By Company')),
-                      DropdownMenuItem(value: 'email', child: Text('By Email')),
+                      // DropdownMenuItem(value: 'email', child: Text('By Email')), // Email feature commented out for now
                       DropdownMenuItem(value: 'mobile', child: Text('By Mobile Number')),
                       DropdownMenuItem(value: 'date', child: Text('By Date')),
                       DropdownMenuItem(value: 'creator', child: Text('By Creator')),
@@ -643,7 +645,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
                               const Padding(
                                 padding: EdgeInsets.only(top: 8),
                                 child: Text(
-                                  'Download or email a quotation to see it here',
+                                  'Download a quotation to see it here', // Email feature commented out
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.grey,
