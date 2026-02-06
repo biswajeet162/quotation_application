@@ -67,22 +67,42 @@ class PdfService {
         final file = File(outputPath);
         await file.writeAsBytes(pdfBytes);
 
-        // Save to quotation history (only if not updating existing)
-        if (quotationId == null) {
-          await _saveQuotationHistory(
-            context: context,
-            quotationNumber: quotationNumber,
-            quotationDate: quotationDate,
-            customerName: customerName,
-            customerAddress: customerAddress,
-            customerContact: customerContact,
-            customerEmail: customerEmail,
-            items: items,
-            totalAmount: totalAmount,
-            totalGstAmount: totalGstAmount,
-            grandTotal: grandTotal,
-            action: 'download',
+        // Update or save to quotation history
+        if (quotationId != null) {
+          // Update existing quotation by ID
+          await DatabaseHelper.instance.updateQuotationHistoryAction(
+            quotationId!,
+            'download',
+            updatedAt: DateTime.now(),
           );
+        } else {
+          // Check if quotation with same number already exists
+          final existingQuotations = await DatabaseHelper.instance.getQuotationHistoryByNumber(quotationNumber);
+          if (existingQuotations.isNotEmpty) {
+            // Update the existing quotation instead of creating a new one
+            final existingQuotation = existingQuotations.first;
+            await DatabaseHelper.instance.updateQuotationHistoryAction(
+              existingQuotation.id!,
+              'download',
+              updatedAt: DateTime.now(),
+            );
+          } else {
+            // No existing quotation found, create new one
+            await _saveQuotationHistory(
+              context: context,
+              quotationNumber: quotationNumber,
+              quotationDate: quotationDate,
+              customerName: customerName,
+              customerAddress: customerAddress,
+              customerContact: customerContact,
+              customerEmail: customerEmail,
+              items: items,
+              totalAmount: totalAmount,
+              totalGstAmount: totalGstAmount,
+              grandTotal: grandTotal,
+              action: 'download',
+            );
+          }
         }
 
         if (context.mounted) {
@@ -100,22 +120,42 @@ class PdfService {
         final file = File('${output.path}/quotation_$quotationNumber.pdf');
         await file.writeAsBytes(pdfBytes);
 
-        // Save to quotation history even if user cancelled file picker (only if not updating existing)
-        if (quotationId == null) {
-          await _saveQuotationHistory(
-            context: context,
-            quotationNumber: quotationNumber,
-            quotationDate: quotationDate,
-            customerName: customerName,
-            customerAddress: customerAddress,
-            customerContact: customerContact,
-            customerEmail: customerEmail,
-            items: items,
-            totalAmount: totalAmount,
-            totalGstAmount: totalGstAmount,
-            grandTotal: grandTotal,
-            action: 'download',
+        // Update or save to quotation history even if user cancelled file picker
+        if (quotationId != null) {
+          // Update existing quotation by ID
+          await DatabaseHelper.instance.updateQuotationHistoryAction(
+            quotationId!,
+            'download',
+            updatedAt: DateTime.now(),
           );
+        } else {
+          // Check if quotation with same number already exists
+          final existingQuotations = await DatabaseHelper.instance.getQuotationHistoryByNumber(quotationNumber);
+          if (existingQuotations.isNotEmpty) {
+            // Update the existing quotation instead of creating a new one
+            final existingQuotation = existingQuotations.first;
+            await DatabaseHelper.instance.updateQuotationHistoryAction(
+              existingQuotation.id!,
+              'download',
+              updatedAt: DateTime.now(),
+            );
+          } else {
+            // No existing quotation found, create new one
+            await _saveQuotationHistory(
+              context: context,
+              quotationNumber: quotationNumber,
+              quotationDate: quotationDate,
+              customerName: customerName,
+              customerAddress: customerAddress,
+              customerContact: customerContact,
+              customerEmail: customerEmail,
+              items: items,
+              totalAmount: totalAmount,
+              totalGstAmount: totalGstAmount,
+              grandTotal: grandTotal,
+              action: 'download',
+            );
+          }
         }
 
         if (context.mounted) {

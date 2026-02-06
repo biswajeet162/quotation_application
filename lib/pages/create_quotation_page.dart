@@ -7,6 +7,7 @@ import '../models/company.dart';
 import '../models/quotation_history.dart';
 import '../database/database_helper.dart';
 import '../services/auth_service.dart';
+import '../services/pdf_service.dart';
 import 'quotation_preview_page.dart';
 import '../widgets/page_header.dart';
 
@@ -306,6 +307,104 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     );
   }
 
+  Future<void> _downloadQuotation() async {
+    // Validate required fields
+    if (_customerNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter customer name'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Get valid items for quotation
+    final validItems = _items.where((item) => item.product != null).toList();
+    if (validItems.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please add at least one item to download'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Calculate totals
+    double totalAmount = 0;
+    double totalGstAmount = 0;
+    double grandTotal = 0;
+    for (var item in validItems) {
+      totalAmount += item.unitPrice;
+      totalGstAmount += item.gstAmount;
+      grandTotal += item.lineTotal;
+    }
+
+    // Generate unique quotation number
+    final quotationNumber = await _generateUniqueQuotationNumber();
+    
+    // Download PDF
+    await PdfService.generateAndSaveQuotation(
+      context: context,
+      quotationNumber: quotationNumber,
+      quotationDate: _selectedDate ?? DateTime.now(),
+      customerName: _customerNameController.text.trim(),
+      customerAddress: _addressController.text.trim(),
+      customerContact: _mobileController.text.trim(),
+      customerEmail: _emailController.text.trim(),
+      items: validItems,
+      totalAmount: totalAmount,
+      totalGstAmount: totalGstAmount,
+      grandTotal: grandTotal,
+    );
+  }
+
+  void _clearQuotation() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Quotation'),
+        content: const Text('Are you sure you want to clear all quotation data? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() {
+        // Clear customer details
+        _customerNameController.clear();
+        _addressController.clear();
+        _mobileController.clear();
+        _emailController.clear();
+        _selectedDate = null;
+        
+        // Clear items
+        _items.clear();
+        _addNewItem(); // Add one empty item
+      });
+      
+      // Schedule callback after the current build phase
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onDataChanged?.call(_hasData());
+      });
+    }
+  }
+
   Future<void> _saveQuotation() async {
     // Validate required fields
     if (_customerNameController.text.trim().isEmpty) {
@@ -493,10 +592,31 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        // Action Buttons (Preview, Save)
+                        // Action Buttons (Clear, Preview, Download)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
+                            ElevatedButton.icon(
+                              onPressed: _clearQuotation,
+                              icon: const Icon(Icons.clear, color: Colors.white),
+                              label: const Text(
+                                'Clear',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
                             ElevatedButton.icon(
                               onPressed: _previewQuotation,
                               icon: const Icon(Icons.preview, color: Colors.white),
@@ -519,10 +639,10 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                             ),
                             const SizedBox(width: 12),
                             ElevatedButton.icon(
-                              onPressed: _saveQuotation,
-                              icon: const Icon(Icons.save, color: Colors.white),
+                              onPressed: _downloadQuotation,
+                              icon: const Icon(Icons.download, color: Colors.white),
                               label: const Text(
-                                'Save',
+                                'Download',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,

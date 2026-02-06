@@ -60,20 +60,8 @@ class QuotationPreviewPage extends StatelessWidget {
       grandTotal: totals['grandTotal']!,
       quotationId: quotationId, // Pass ID to prevent duplicate insertion
     );
-    
-    // If this is a saved quotation from history, update its action to "downloaded" and update timestamp
-    if (quotationId != null) {
-      try {
-        await DatabaseHelper.instance.updateQuotationHistoryAction(
-          quotationId!,
-          'download',
-          updatedAt: DateTime.now(), // Update to current time when downloaded
-        );
-      } catch (e) {
-        // Log error but don't show to user as PDF was already downloaded
-        debugPrint('Error updating quotation action: $e');
-      }
-    }
+    // Note: The PDF service now handles updating existing quotations by quotation number
+    // So we don't need to update here separately anymore
   }
 
   // Email feature commented out for now
