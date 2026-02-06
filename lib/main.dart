@@ -71,7 +71,9 @@ class _MainScreenState extends State<MainScreen> {
     final pages = [
       const ProductsPage(),
       const PlaceholderPage(title: 'Dashboard'),
-      const CreateQuotationPage(),
+      CreateQuotationPage(
+        onDataChanged: _updateQuotationDataStatus,
+      ),
       const QuotationHistoryPage(),
       const CompaniesPage(),
       SettingsPage(userEmail: authService.currentUser?.email ?? ''),
@@ -91,37 +93,8 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  Future<void> _onItemSelected(int index) async {
-    // If trying to navigate away from Create Quotation page and there's data
-    if (_selectedIndex == 2 && index != 2 && _hasQuotationData) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Unsaved Changes'),
-          content: const Text(
-            'You have unsaved quotation data. All data will be erased if you navigate away. Do you want to continue?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
-              child: const Text('Continue'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed != true) {
-        return; // Don't navigate if user cancelled
-      }
-    }
-
+  void _onItemSelected(int index) {
+    // Allow navigation without warning - data will be preserved
     setState(() {
       _selectedIndex = index;
     });
@@ -142,11 +115,11 @@ class _MainScreenState extends State<MainScreen> {
             isAdmin: isAdmin,
           ),
           Expanded(
-            child: _selectedIndex == 2
-                ? CreateQuotationPage(
-                    onDataChanged: _updateQuotationDataStatus,
-                  )
-                : pages[_selectedIndex],
+            // Use IndexedStack to preserve state of all pages, including CreateQuotationPage
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: pages,
+            ),
           ),
         ],
       ),
