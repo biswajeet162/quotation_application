@@ -16,7 +16,6 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
   List<QuotationHistory> _quotations = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String _filterAction = 'all'; // 'all', 'download' // 'email' commented out for now
   String _categorizationType = 'all'; // 'all', 'company', 'mobile', 'date', 'creator' // 'email' commented out for now
   DateTime? _lastLoadTime;
 
@@ -83,11 +82,6 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
 
   List<QuotationHistory> get _filteredQuotations {
     var filtered = _quotations;
-
-    // Filter by action type
-    if (_filterAction != 'all') {
-      filtered = filtered.where((q) => q.action == _filterAction).toList();
-    }
 
     // Filter by search query
     if (_searchQuery.isNotEmpty) {
@@ -577,31 +571,6 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Action Filter dropdown
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[400]!),
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.white,
-                  ),
-                  child: DropdownButton<String>(
-                    value: _filterAction,
-                    underline: const SizedBox(),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('All Actions')),
-                      DropdownMenuItem(value: 'download', child: Text('Downloaded')),
-                      // DropdownMenuItem(value: 'email', child: Text('Emailed')), // Email feature commented out for now
-                      DropdownMenuItem(value: 'saved', child: Text('Saved')),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        _filterAction = value!;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
                 // Categorization dropdown
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -653,8 +622,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _searchQuery.isNotEmpty || 
-                              _filterAction != 'all'
+                              _searchQuery.isNotEmpty
                                   ? 'No quotations found matching your criteria'
                                   : 'No quotation history yet',
                               style: TextStyle(
@@ -662,7 +630,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
                                 color: Colors.grey[600],
                               ),
                             ),
-                            if (_searchQuery.isEmpty && _filterAction == 'all')
+                            if (_searchQuery.isEmpty)
                               const Padding(
                                 padding: EdgeInsets.only(top: 8),
                                 child: Text(
