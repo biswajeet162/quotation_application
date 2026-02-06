@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/quotation_item.dart';
 import '../services/pdf_service.dart';
 import '../services/email_service.dart';
+import '../database/database_helper.dart';
 
 class QuotationPreviewPage extends StatelessWidget {
   final String quotationNumber;
@@ -12,6 +13,7 @@ class QuotationPreviewPage extends StatelessWidget {
   final String customerContact;
   final String customerEmail;
   final List<QuotationItem> items;
+  final int? quotationId; // Optional ID to update action when downloaded
 
   const QuotationPreviewPage({
     super.key,
@@ -22,6 +24,7 @@ class QuotationPreviewPage extends StatelessWidget {
     required this.customerContact,
     required this.customerEmail,
     required this.items,
+    this.quotationId,
   });
 
   // Calculate totals
@@ -55,7 +58,22 @@ class QuotationPreviewPage extends StatelessWidget {
       totalAmount: totals['totalAmount']!,
       totalGstAmount: totals['totalGstAmount']!,
       grandTotal: totals['grandTotal']!,
+      quotationId: quotationId, // Pass ID to prevent duplicate insertion
     );
+    
+    // If this is a saved quotation from history, update its action to "downloaded" and update timestamp
+    if (quotationId != null) {
+      try {
+        await DatabaseHelper.instance.updateQuotationHistoryAction(
+          quotationId!,
+          'download',
+          updatedAt: DateTime.now(), // Update to current time when downloaded
+        );
+      } catch (e) {
+        // Log error but don't show to user as PDF was already downloaded
+        debugPrint('Error updating quotation action: $e');
+      }
+    }
   }
 
   Future<void> _emailQuotation(BuildContext context) async {
@@ -72,7 +90,22 @@ class QuotationPreviewPage extends StatelessWidget {
       totalAmount: totals['totalAmount']!,
       totalGstAmount: totals['totalGstAmount']!,
       grandTotal: totals['grandTotal']!,
+      quotationId: quotationId, // Pass ID to prevent duplicate insertion
     );
+    
+    // If this is a saved quotation from history, update its action to "email" and update timestamp
+    if (quotationId != null) {
+      try {
+        await DatabaseHelper.instance.updateQuotationHistoryAction(
+          quotationId!,
+          'email',
+          updatedAt: DateTime.now(), // Update to current time when emailed
+        );
+      } catch (e) {
+        // Log error but don't show to user as email was already sent
+        debugPrint('Error updating quotation action: $e');
+      }
+    }
   }
 
   @override

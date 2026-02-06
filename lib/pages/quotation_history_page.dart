@@ -227,8 +227,12 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
         customerContact: quotation.customerContact,
         customerEmail: quotation.customerEmail,
         items: quotation.items,
+        quotationId: quotation.id, // Pass the ID to update action when downloaded
       ),
-    );
+    ).then((_) {
+      // Reload quotations after closing the preview to show updated action
+      _loadQuotations();
+    });
   }
 
   Widget _buildGroupedQuotationsList() {

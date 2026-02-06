@@ -743,6 +743,25 @@ class DatabaseHelper {
     return result.map((map) => QuotationHistory.fromMap(map)).toList();
   }
 
+  Future<int> updateQuotationHistoryAction(int id, String action, {DateTime? updatedAt}) async {
+    final db = await database;
+    final updateData = <String, dynamic>{
+      'action': action,
+    };
+    
+    // Update createdAt timestamp if provided
+    if (updatedAt != null) {
+      updateData['createdAt'] = updatedAt.toIso8601String();
+    }
+    
+    return await db.update(
+      'quotations_history',
+      updateData,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<int> deleteQuotationHistory(int id) async {
     final db = await database;
     return await db.delete(

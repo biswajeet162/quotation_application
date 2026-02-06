@@ -24,6 +24,7 @@ class EmailService {
     required double totalAmount,
     required double totalGstAmount,
     required double grandTotal,
+    int? quotationId, // Optional ID - if provided, update existing instead of inserting
   }) async {
     try {
       // Generate PDF
@@ -68,21 +69,23 @@ class EmailService {
         // Try to launch URL directly (works better on Windows)
         await launchUrl(mailtoUri, mode: LaunchMode.externalApplication);
         
-        // Save to quotation history
-        await _saveQuotationHistory(
-          context: context,
-          quotationNumber: quotationNumber,
-          quotationDate: quotationDate,
-          customerName: customerName,
-          customerAddress: customerAddress,
-          customerContact: customerContact,
-          customerEmail: customerEmail,
-          items: items,
-          totalAmount: totalAmount,
-          totalGstAmount: totalGstAmount,
-          grandTotal: grandTotal,
-          action: 'email',
-        );
+        // Save to quotation history (only if not updating existing)
+        if (quotationId == null) {
+          await _saveQuotationHistory(
+            context: context,
+            quotationNumber: quotationNumber,
+            quotationDate: quotationDate,
+            customerName: customerName,
+            customerAddress: customerAddress,
+            customerContact: customerContact,
+            customerEmail: customerEmail,
+            items: items,
+            totalAmount: totalAmount,
+            totalGstAmount: totalGstAmount,
+            grandTotal: grandTotal,
+            action: 'email',
+          );
+        }
         
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -95,21 +98,23 @@ class EmailService {
         }
       } catch (e) {
         // If launch fails, show the email body and PDF path for manual copy
-        // Still save to history even if email client fails to open
-        await _saveQuotationHistory(
-          context: context,
-          quotationNumber: quotationNumber,
-          quotationDate: quotationDate,
-          customerName: customerName,
-          customerAddress: customerAddress,
-          customerContact: customerContact,
-          customerEmail: customerEmail,
-          items: items,
-          totalAmount: totalAmount,
-          totalGstAmount: totalGstAmount,
-          grandTotal: grandTotal,
-          action: 'email',
-        );
+        // Still save to history even if email client fails to open (only if not updating existing)
+        if (quotationId == null) {
+          await _saveQuotationHistory(
+            context: context,
+            quotationNumber: quotationNumber,
+            quotationDate: quotationDate,
+            customerName: customerName,
+            customerAddress: customerAddress,
+            customerContact: customerContact,
+            customerEmail: customerEmail,
+            items: items,
+            totalAmount: totalAmount,
+            totalGstAmount: totalGstAmount,
+            grandTotal: grandTotal,
+            action: 'email',
+          );
+        }
         
         if (context.mounted) {
           _showEmailInfoDialog(

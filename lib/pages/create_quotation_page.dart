@@ -246,13 +246,36 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     }
   }
 
-  String _generateQuotationNumber() {
+  Future<String> _generateUniqueQuotationNumber() async {
     // Generate quotation number based on current date/time
     final now = DateTime.now();
-    return '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+    String baseNumber = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+    
+    // Check if this number already exists
+    List<QuotationHistory> existing = await _dbHelper.getQuotationHistoryByNumber(baseNumber);
+    
+    // If it exists, append seconds and milliseconds to make it unique
+    if (existing.isNotEmpty) {
+      baseNumber = '${baseNumber}${now.second.toString().padLeft(2, '0')}${now.millisecond.toString().padLeft(3, '0')}';
+      
+      // Double check if this new number exists (very unlikely but just in case)
+      List<QuotationHistory> stillExists = await _dbHelper.getQuotationHistoryByNumber(baseNumber);
+      int counter = 1;
+      String uniqueNumber = baseNumber;
+      
+      // If still exists, keep appending counter until we find a unique one
+      while (stillExists.isNotEmpty) {
+        uniqueNumber = '${baseNumber}_$counter';
+        stillExists = await _dbHelper.getQuotationHistoryByNumber(uniqueNumber);
+        counter++;
+      }
+      return uniqueNumber;
+    }
+    
+    return baseNumber;
   }
 
-  void _previewQuotation() {
+  Future<void> _previewQuotation() async {
     // Check if there's at least one item with a product selected
     final validItems = _items.where((item) => item.product != null).toList();
     if (validItems.isEmpty) {
@@ -265,10 +288,14 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       return;
     }
 
+    final quotationNumber = await _generateUniqueQuotationNumber();
+    
+    if (!mounted) return;
+    
     showDialog(
       context: context,
       builder: (context) => QuotationPreviewPage(
-        quotationNumber: _generateQuotationNumber(),
+        quotationNumber: quotationNumber,
         quotationDate: _selectedDate ?? DateTime.now(),
         customerName: _customerNameController.text,
         customerAddress: _addressController.text,
@@ -364,8 +391,11 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           ? currentUser!.name
           : (currentUser?.email ?? 'Unknown');
       
+      // Generate unique quotation number
+      final quotationNumber = await _generateUniqueQuotationNumber();
+      
       final quotationHistory = QuotationHistory(
-        quotationNumber: _generateQuotationNumber(),
+        quotationNumber: quotationNumber,
         quotationDate: _selectedDate ?? DateTime.now(),
         customerName: _customerNameController.text.trim(),
         customerAddress: _addressController.text.trim(),
@@ -408,6 +438,12 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       _addressController.text = company.address;
       _mobileController.text = company.mobile;
       _emailController.text = company.email;
+      // Set default date to current date when company is selected
+      _selectedDate = DateTime.now();
+    });
+    // Schedule callback after the current build phase
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onDataChanged?.call(_hasData());
     });
   }
 
@@ -1071,7 +1107,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     // Use a key to ensure the autocomplete rebuilds when product changes
     return Autocomplete<Product>(
       key: ValueKey('product_${itemIndex}_${item.product?.id ?? 'none'}'),
-      displayStringForOption: (Product product) => product.information,
+      displayStringForOption: (Product product) => product.designation,
       optionsBuilder: (TextEditingValue textEditingValue) {
         final query = textEditingValue.text.trim().toLowerCase();
         
@@ -1080,26 +1116,10 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
           return _products;
         }
         
-        // Filter products based on group, price (RSP), and information
+        // Filter products based on designation only
         return _products.where((product) {
-          // Search in group
-          if (product.group.toLowerCase().contains(query)) {
-            return true;
-          }
-          
-          // Search in price (RSP) - check both formatted and raw values
-          final rspString = product.rsp.toString();
-          final rspFormatted = product.rsp.toStringAsFixed(2);
-          if (rspString.contains(query) || rspFormatted.contains(query)) {
-            return true;
-          }
-          
-          // Search in information
-          if (product.information.toLowerCase().contains(query)) {
-            return true;
-          }
-          
-          return false;
+          // Search in designation only
+          return product.designation.toLowerCase().contains(query);
         });
       },
       fieldViewBuilder: (
@@ -1108,13 +1128,13 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         FocusNode focusNode,
         VoidCallback onFieldSubmitted,
       ) {
-        // Initialize with selected product's information if available
+        // Initialize with selected product's designation if available
         final currentProduct = item.product;
         if (currentProduct != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (currentProduct == item.product && 
-                textEditingController.text != currentProduct.information) {
-              textEditingController.text = currentProduct.information;
+                textEditingController.text != currentProduct.designation) {
+              textEditingController.text = currentProduct.designation;
             }
           });
         }
@@ -1181,26 +1201,18 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Group: ${product.group}',
+                          product.designation,
                           style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Designation: ${product.designation}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Price: ₹${product.rsp.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                            fontWeight: FontWeight.normal,
                           ),
                         ),
                       ],

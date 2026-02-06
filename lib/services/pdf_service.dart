@@ -25,6 +25,7 @@ class PdfService {
     required double totalAmount,
     required double totalGstAmount,
     required double grandTotal,
+    int? quotationId, // Optional ID - if provided, update existing instead of inserting
   }) async {
     try {
       // Create PDF document
@@ -66,21 +67,23 @@ class PdfService {
         final file = File(outputPath);
         await file.writeAsBytes(pdfBytes);
 
-        // Save to quotation history
-        await _saveQuotationHistory(
-          context: context,
-          quotationNumber: quotationNumber,
-          quotationDate: quotationDate,
-          customerName: customerName,
-          customerAddress: customerAddress,
-          customerContact: customerContact,
-          customerEmail: customerEmail,
-          items: items,
-          totalAmount: totalAmount,
-          totalGstAmount: totalGstAmount,
-          grandTotal: grandTotal,
-          action: 'download',
-        );
+        // Save to quotation history (only if not updating existing)
+        if (quotationId == null) {
+          await _saveQuotationHistory(
+            context: context,
+            quotationNumber: quotationNumber,
+            quotationDate: quotationDate,
+            customerName: customerName,
+            customerAddress: customerAddress,
+            customerContact: customerContact,
+            customerEmail: customerEmail,
+            items: items,
+            totalAmount: totalAmount,
+            totalGstAmount: totalGstAmount,
+            grandTotal: grandTotal,
+            action: 'download',
+          );
+        }
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -97,21 +100,23 @@ class PdfService {
         final file = File('${output.path}/quotation_$quotationNumber.pdf');
         await file.writeAsBytes(pdfBytes);
 
-        // Save to quotation history even if user cancelled file picker
-        await _saveQuotationHistory(
-          context: context,
-          quotationNumber: quotationNumber,
-          quotationDate: quotationDate,
-          customerName: customerName,
-          customerAddress: customerAddress,
-          customerContact: customerContact,
-          customerEmail: customerEmail,
-          items: items,
-          totalAmount: totalAmount,
-          totalGstAmount: totalGstAmount,
-          grandTotal: grandTotal,
-          action: 'download',
-        );
+        // Save to quotation history even if user cancelled file picker (only if not updating existing)
+        if (quotationId == null) {
+          await _saveQuotationHistory(
+            context: context,
+            quotationNumber: quotationNumber,
+            quotationDate: quotationDate,
+            customerName: customerName,
+            customerAddress: customerAddress,
+            customerContact: customerContact,
+            customerEmail: customerEmail,
+            items: items,
+            totalAmount: totalAmount,
+            totalGstAmount: totalGstAmount,
+            grandTotal: grandTotal,
+            action: 'download',
+          );
+        }
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
