@@ -69,22 +69,20 @@ class PdfService {
 
         // Update or save to quotation history
         if (quotationId != null) {
-          // Update existing quotation by ID
+          // Update existing quotation by ID (keep original creation date)
           await DatabaseHelper.instance.updateQuotationHistoryAction(
             quotationId!,
             'download',
-            updatedAt: DateTime.now(),
           );
         } else {
           // Check if quotation with same number already exists
           final existingQuotations = await DatabaseHelper.instance.getQuotationHistoryByNumber(quotationNumber);
           if (existingQuotations.isNotEmpty) {
-            // Update the existing quotation instead of creating a new one
+            // Update the existing quotation instead of creating a new one (keep original creation date)
             final existingQuotation = existingQuotations.first;
             await DatabaseHelper.instance.updateQuotationHistoryAction(
               existingQuotation.id!,
               'download',
-              updatedAt: DateTime.now(),
             );
           } else {
             // No existing quotation found, create new one
@@ -122,22 +120,20 @@ class PdfService {
 
         // Update or save to quotation history even if user cancelled file picker
         if (quotationId != null) {
-          // Update existing quotation by ID
+          // Update existing quotation by ID (keep original creation date)
           await DatabaseHelper.instance.updateQuotationHistoryAction(
             quotationId!,
             'download',
-            updatedAt: DateTime.now(),
           );
         } else {
           // Check if quotation with same number already exists
           final existingQuotations = await DatabaseHelper.instance.getQuotationHistoryByNumber(quotationNumber);
           if (existingQuotations.isNotEmpty) {
-            // Update the existing quotation instead of creating a new one
+            // Update the existing quotation instead of creating a new one (keep original creation date)
             final existingQuotation = existingQuotations.first;
             await DatabaseHelper.instance.updateQuotationHistoryAction(
               existingQuotation.id!,
               'download',
-              updatedAt: DateTime.now(),
             );
           } else {
             // No existing quotation found, create new one
