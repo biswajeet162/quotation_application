@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/quotation_item.dart';
+import '../models/my_company.dart';
 import '../services/pdf_service.dart';
 // import '../services/email_service.dart'; // Email feature commented out for now
 import '../database/database_helper.dart';
@@ -246,40 +247,32 @@ class QuotationPreviewPage extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                const Flexible(
+                                Flexible(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Ashoka Bearing Enterprises',
-                                        style: TextStyle(
-                                          fontSize: 16,
+                                        MyCompany.name,
+                                        style: const TextStyle(
+                                          fontSize: 18,
                                           fontWeight: FontWeight.bold,
                                           letterSpacing: 0.5,
                                         ),
                                       ),
-                                      SizedBox(height: 6),
+                                      const SizedBox(height: 6),
+                                      ...MyCompany.address.split('\n').map((line) => Text(
+                                        line,
+                                        style: const TextStyle(fontSize: 13),
+                                      )),
+                                      const SizedBox(height: 6),
                                       Text(
-                                        '2, Ring Rd, Awas Vikas,',
-                                        style: TextStyle(fontSize: 11),
+                                        'GST: ${MyCompany.gst}',
+                                        style: const TextStyle(fontSize: 13),
                                       ),
+                                      const SizedBox(height: 2),
                                       Text(
-                                        'Rudrapur, Jagatpura,',
-                                        style: TextStyle(fontSize: 11),
-                                      ),
-                                      Text(
-                                        'Uttarakhand 263153',
-                                        style: TextStyle(fontSize: 11),
-                                      ),
-                                      SizedBox(height: 6),
-                                      Text(
-                                        'GSTIN No.: XXXXXXX XXXXXXXX',
-                                        style: TextStyle(fontSize: 11),
-                                      ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        'PAN No.: XXXXX XXXXXX',
-                                        style: TextStyle(fontSize: 11),
+                                        'PAN: ${MyCompany.pan}',
+                                        style: const TextStyle(fontSize: 13),
                                       ),
                                     ],
                                   ),
@@ -305,26 +298,29 @@ class QuotationPreviewPage extends StatelessWidget {
                               const Text(
                                 'Customer Details',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               const SizedBox(height: 6),
                               Text(
                                 customerName.isEmpty ? 'Customer Name' : customerName,
-                                style: const TextStyle(fontSize: 11),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 customerAddress.isEmpty ? 'Address' : customerAddress,
-                                style: const TextStyle(fontSize: 11),
+                                style: const TextStyle(fontSize: 13),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 customerContact.isEmpty
                                     ? 'Contact.: XXXXXXX XXXXXXXX'
                                     : 'Contact.: $customerContact',
-                                style: const TextStyle(fontSize: 11),
+                                style: const TextStyle(fontSize: 13),
                               ),
                             ],
                           ),

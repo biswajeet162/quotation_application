@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../models/quotation_item.dart';
 import '../models/quotation_history.dart';
+import '../models/my_company.dart';
 import '../database/database_helper.dart';
 import '../services/auth_service.dart';
 
@@ -275,24 +276,27 @@ class PdfService {
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
                             pw.Text(
-                              'Ashoka Bearing Enterprises',
+                              MyCompany.name,
                               style: pw.TextStyle(
                                 fontSize: 18,
                                 fontWeight: pw.FontWeight.bold,
                               ),
                             ),
                             pw.SizedBox(height: 4),
-                            pw.Text(
-                              '2, Ring Rd, Awas Vikas, Rudrapur, Jagatpura, Uttarakhand 263153',
-                              style: const pw.TextStyle(fontSize: 12),
-                            ),
+                            ...MyCompany.address.split('\n').map((line) => pw.Padding(
+                              padding: const pw.EdgeInsets.only(bottom: 2),
+                              child: pw.Text(
+                                line,
+                                style: const pw.TextStyle(fontSize: 12),
+                              ),
+                            )),
                             pw.SizedBox(height: 4),
                             pw.Text(
-                              'GSTIN No.: XXXXXXX XXXXXXXX',
+                              'GST: ${MyCompany.gst}',
                               style: const pw.TextStyle(fontSize: 12),
                             ),
                             pw.Text(
-                              'PAN No.: XXXXX XXXXXX',
+                              'PAN: ${MyCompany.pan}',
                               style: const pw.TextStyle(fontSize: 12),
                             ),
                           ],

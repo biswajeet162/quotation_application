@@ -63,6 +63,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   bool _hasQuotationData = false;
+  final GlobalKey<QuotationHistoryPageState> _quotationHistoryKey = GlobalKey<QuotationHistoryPageState>();
 
   List<Widget> _buildPages(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -74,7 +75,7 @@ class _MainScreenState extends State<MainScreen> {
       CreateQuotationPage(
         onDataChanged: _updateQuotationDataStatus,
       ),
-      const QuotationHistoryPage(),
+      QuotationHistoryPage(key: _quotationHistoryKey),
       const CompaniesPage(),
       SettingsPage(userEmail: authService.currentUser?.email ?? ''),
     ];
@@ -98,6 +99,14 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _selectedIndex = index;
     });
+    
+    // Reload quotation history when that tab is selected (always at index 3)
+    if (index == 3) {
+      // Small delay to ensure the widget is built
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _quotationHistoryKey.currentState?.reloadData();
+      });
+    }
   }
 
   @override

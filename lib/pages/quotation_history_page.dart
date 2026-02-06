@@ -9,15 +9,16 @@ class QuotationHistoryPage extends StatefulWidget {
   const QuotationHistoryPage({super.key});
 
   @override
-  State<QuotationHistoryPage> createState() => _QuotationHistoryPageState();
+  State<QuotationHistoryPage> createState() => QuotationHistoryPageState();
 }
 
-class _QuotationHistoryPageState extends State<QuotationHistoryPage> with AutomaticKeepAliveClientMixin {
+class QuotationHistoryPageState extends State<QuotationHistoryPage> with AutomaticKeepAliveClientMixin {
   List<QuotationHistory> _quotations = [];
   bool _isLoading = true;
   String _searchQuery = '';
   String _categorizationType = 'all'; // 'all', 'company', 'mobile', 'date', 'creator' // 'email' commented out for now
   DateTime? _lastLoadTime;
+  bool _isLoadingInProgress = false;
 
   @override
   bool get wantKeepAlive => true;
@@ -28,20 +29,18 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
     _loadQuotations();
   }
 
-  // Reload quotations when page becomes visible (called from build)
-  void _checkAndReload() {
-    final now = DateTime.now();
-    // Reload if it's been more than 1 second since last load, or if never loaded
-    if (_lastLoadTime == null || now.difference(_lastLoadTime!).inSeconds > 1) {
+  void reloadData() {
+    if (mounted && !_isLoadingInProgress) {
       _loadQuotations();
     }
   }
 
   Future<void> _loadQuotations() async {
-    if (!mounted) return;
+    if (!mounted || _isLoadingInProgress) return;
     
     setState(() {
       _isLoading = true;
+      _isLoadingInProgress = true;
     });
 
     try {
@@ -53,6 +52,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
         setState(() {
           _quotations = quotations;
           _isLoading = false;
+          _isLoadingInProgress = false;
           _lastLoadTime = DateTime.now();
         });
       }
@@ -62,6 +62,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isLoadingInProgress = false;
           _quotations = []; // Ensure list is empty on error
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -532,11 +533,6 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> with Automa
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
-    // Reload quotations when page becomes visible
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkAndReload();
-    });
 
     return Scaffold(
       backgroundColor: Colors.grey[200],
