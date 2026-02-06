@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
+import '../models/my_company.dart';
 import 'password_reset_page.dart';
 import 'package:intl/intl.dart';
 import '../widgets/page_header.dart';
@@ -27,6 +28,66 @@ class SettingsPage extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                Card(
+                  child: ExpansionTile(
+                    leading: const Icon(Icons.business),
+                    title: const Text('My Company Details'),
+                    subtitle: Text(MyCompany.name),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInfoRow(
+                              'Company Name',
+                              MyCompany.name,
+                              Icons.business_outlined,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.location_on_outlined, size: 20, color: Colors.grey[600]),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Address: ',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[700],
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      MyCompany.address,
+                                      style: TextStyle(
+                                        color: Colors.grey[800],
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            _buildInfoRow(
+                              'GST',
+                              MyCompany.gst,
+                              Icons.receipt_outlined,
+                            ),
+                            _buildInfoRow(
+                              'PAN',
+                              MyCompany.pan,
+                              Icons.badge_outlined,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Card(
                   child: ExpansionTile(
                     leading: const Icon(Icons.person),

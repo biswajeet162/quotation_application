@@ -48,7 +48,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 9,
+      version: 10,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -114,6 +114,18 @@ class DatabaseHelper {
         action $textType,
         createdBy $textType,
         createdAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE my_company (
+        id INTEGER PRIMARY KEY CHECK(id = 1),
+        name $textType,
+        address $textType,
+        mobile $textType,
+        email $textType,
+        gstin TEXT,
+        updatedAt TEXT NOT NULL
       )
     ''');
 
@@ -360,6 +372,20 @@ class DatabaseHelper {
         debugPrint('Error migrating designation column to TEXT: $e');
         // If migration fails, the fromMap will handle conversion
       }
+    }
+    if (oldVersion < 10) {
+      // Add my_company table
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS my_company (
+          id INTEGER PRIMARY KEY CHECK(id = 1),
+          name TEXT NOT NULL,
+          address TEXT NOT NULL,
+          mobile TEXT NOT NULL,
+          email TEXT NOT NULL,
+          gstin TEXT,
+          updatedAt TEXT NOT NULL
+        )
+      ''');
     }
   }
 
@@ -636,6 +662,62 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // My Company management methods
+  Future<Map<String, dynamic>?> getMyCompany() async {
+    final db = await database;
+    final result = await db.query(
+      'my_company',
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return result.first;
+  }
+
+  Future<void> saveMyCompany({
+    required String name,
+    required String address,
+    required String mobile,
+    required String email,
+    String? gstin,
+  }) async {
+    final db = await database;
+    
+    // Check if my_company record exists
+    final existing = await db.query(
+      'my_company',
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+
+    final data = {
+      'id': 1,
+      'name': name,
+      'address': address,
+      'mobile': mobile,
+      'email': email,
+      'gstin': gstin ?? '',
+      'updatedAt': DateTime.now().toIso8601String(),
+    };
+
+    if (existing.isEmpty) {
+      // Insert new record
+      await db.insert('my_company', data);
+    } else {
+      // Update existing record
+      await db.update(
+        'my_company',
+        data,
+        where: 'id = ?',
+        whereArgs: [1],
+      );
+    }
   }
 
   // Quotation History management methods
