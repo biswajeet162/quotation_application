@@ -46,6 +46,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   final List<QuotationItem> _items = [];
   List<Product> _products = [];
   List<Company> _companies = [];
+  
+  // Store the last downloaded quotation number to prevent duplicates
+  String? _lastDownloadedQuotationNumber;
 
   @override
   void initState() {
@@ -343,8 +346,42 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       grandTotal += item.lineTotal;
     }
 
-    // Generate unique quotation number
-    final quotationNumber = await _generateUniqueQuotationNumber();
+    // Check if we have a previously downloaded quotation number for this data
+    String quotationNumber;
+    int? existingQuotationId;
+    
+    if (_lastDownloadedQuotationNumber != null) {
+      // Check if the quotation still exists
+      final existingQuotations = await _dbHelper.getQuotationHistoryByNumber(_lastDownloadedQuotationNumber!);
+      if (existingQuotations.isNotEmpty) {
+        final existing = existingQuotations.first;
+        // Verify it's the same quotation (same customer, date, and total)
+        final quotationDate = _selectedDate ?? DateTime.now();
+        final dateMatch = existing.quotationDate.year == quotationDate.year &&
+                         existing.quotationDate.month == quotationDate.month &&
+                         existing.quotationDate.day == quotationDate.day;
+        
+        if (dateMatch && 
+            existing.customerName.trim().toLowerCase() == _customerNameController.text.trim().toLowerCase() &&
+            existing.grandTotal == grandTotal) {
+          // Same quotation, reuse the number and update
+          quotationNumber = _lastDownloadedQuotationNumber!;
+          existingQuotationId = existing.id;
+        } else {
+          // Different quotation, generate new number
+          quotationNumber = await _generateUniqueQuotationNumber();
+          _lastDownloadedQuotationNumber = quotationNumber;
+        }
+      } else {
+        // Quotation doesn't exist, generate new
+        quotationNumber = await _generateUniqueQuotationNumber();
+        _lastDownloadedQuotationNumber = quotationNumber;
+      }
+    } else {
+      // First time downloading, generate new number
+      quotationNumber = await _generateUniqueQuotationNumber();
+      _lastDownloadedQuotationNumber = quotationNumber;
+    }
     
     // Download PDF
     await PdfService.generateAndSaveQuotation(
@@ -359,6 +396,7 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       totalAmount: totalAmount,
       totalGstAmount: totalGstAmount,
       grandTotal: grandTotal,
+      quotationId: existingQuotationId, // Pass ID if updating existing
     );
   }
 
@@ -396,6 +434,9 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
         // Clear items
         _items.clear();
         _addNewItem(); // Add one empty item
+        
+        // Clear last downloaded quotation number
+        _lastDownloadedQuotationNumber = null;
       });
       
       // Schedule callback after the current build phase

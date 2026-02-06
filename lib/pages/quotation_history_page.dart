@@ -12,17 +12,30 @@ class QuotationHistoryPage extends StatefulWidget {
   State<QuotationHistoryPage> createState() => _QuotationHistoryPageState();
 }
 
-class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
+class _QuotationHistoryPageState extends State<QuotationHistoryPage> with AutomaticKeepAliveClientMixin {
   List<QuotationHistory> _quotations = [];
   bool _isLoading = true;
   String _searchQuery = '';
   String _filterAction = 'all'; // 'all', 'download' // 'email' commented out for now
   String _categorizationType = 'all'; // 'all', 'company', 'mobile', 'date', 'creator' // 'email' commented out for now
+  DateTime? _lastLoadTime;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     _loadQuotations();
+  }
+
+  // Reload quotations when page becomes visible (called from build)
+  void _checkAndReload() {
+    final now = DateTime.now();
+    // Reload if it's been more than 1 second since last load, or if never loaded
+    if (_lastLoadTime == null || now.difference(_lastLoadTime!).inSeconds > 1) {
+      _loadQuotations();
+    }
   }
 
   Future<void> _loadQuotations() async {
@@ -41,6 +54,7 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
         setState(() {
           _quotations = quotations;
           _isLoading = false;
+          _lastLoadTime = DateTime.now();
         });
       }
     } catch (e, stackTrace) {
@@ -523,6 +537,13 @@ class _QuotationHistoryPageState extends State<QuotationHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
+    // Reload quotations when page becomes visible
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndReload();
+    });
+
     return Scaffold(
       backgroundColor: Colors.grey[200],
       body: Column(
