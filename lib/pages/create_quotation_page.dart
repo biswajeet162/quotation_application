@@ -279,6 +279,42 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
     return baseNumber;
   }
 
+  // Helper method to get quotation number (reuse if data hasn't changed)
+  Future<String> _getQuotationNumber() async {
+    // Calculate totals to check if data has changed
+    final validItems = _items.where((item) => item.product != null).toList();
+    double grandTotal = 0;
+    for (var item in validItems) {
+      grandTotal += item.lineTotal;
+    }
+
+    // Check if we have a previously downloaded quotation number for this data
+    if (_lastDownloadedQuotationNumber != null) {
+      // Check if the quotation still exists
+      final existingQuotations = await _dbHelper.getQuotationHistoryByNumber(_lastDownloadedQuotationNumber!);
+      if (existingQuotations.isNotEmpty) {
+        final existing = existingQuotations.first;
+        // Verify it's the same quotation (same customer, date, and total)
+        final quotationDate = _selectedDate ?? DateTime.now();
+        final dateMatch = existing.quotationDate.year == quotationDate.year &&
+                         existing.quotationDate.month == quotationDate.month &&
+                         existing.quotationDate.day == quotationDate.day;
+        
+        if (dateMatch && 
+            existing.customerName.trim().toLowerCase() == _customerNameController.text.trim().toLowerCase() &&
+            existing.grandTotal == grandTotal) {
+          // Same quotation, reuse the number
+          return _lastDownloadedQuotationNumber!;
+        }
+      }
+    }
+    
+    // Data has changed or no previous quotation, generate new number
+    final quotationNumber = await _generateUniqueQuotationNumber();
+    _lastDownloadedQuotationNumber = quotationNumber;
+    return quotationNumber;
+  }
+
   Future<void> _previewQuotation() async {
     // Check if there's at least one item with a product selected
     final validItems = _items.where((item) => item.product != null).toList();
@@ -292,7 +328,8 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       return;
     }
 
-    final quotationNumber = await _generateUniqueQuotationNumber();
+    // Get quotation number (reuse if data hasn't changed)
+    final quotationNumber = await _getQuotationNumber();
     
     if (!mounted) return;
     
@@ -346,41 +383,16 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
       grandTotal += item.lineTotal;
     }
 
-    // Check if we have a previously downloaded quotation number for this data
-    String quotationNumber;
-    int? existingQuotationId;
+    // Get quotation number (reuse if data hasn't changed)
+    final quotationNumber = await _getQuotationNumber();
     
-    if (_lastDownloadedQuotationNumber != null) {
-      // Check if the quotation still exists
-      final existingQuotations = await _dbHelper.getQuotationHistoryByNumber(_lastDownloadedQuotationNumber!);
+    // Check if we have an existing quotation to update
+    int? existingQuotationId;
+    if (_lastDownloadedQuotationNumber != null && _lastDownloadedQuotationNumber == quotationNumber) {
+      final existingQuotations = await _dbHelper.getQuotationHistoryByNumber(quotationNumber);
       if (existingQuotations.isNotEmpty) {
-        final existing = existingQuotations.first;
-        // Verify it's the same quotation (same customer, date, and total)
-        final quotationDate = _selectedDate ?? DateTime.now();
-        final dateMatch = existing.quotationDate.year == quotationDate.year &&
-                         existing.quotationDate.month == quotationDate.month &&
-                         existing.quotationDate.day == quotationDate.day;
-        
-        if (dateMatch && 
-            existing.customerName.trim().toLowerCase() == _customerNameController.text.trim().toLowerCase() &&
-            existing.grandTotal == grandTotal) {
-          // Same quotation, reuse the number and update
-          quotationNumber = _lastDownloadedQuotationNumber!;
-          existingQuotationId = existing.id;
-        } else {
-          // Different quotation, generate new number
-          quotationNumber = await _generateUniqueQuotationNumber();
-          _lastDownloadedQuotationNumber = quotationNumber;
-        }
-      } else {
-        // Quotation doesn't exist, generate new
-        quotationNumber = await _generateUniqueQuotationNumber();
-        _lastDownloadedQuotationNumber = quotationNumber;
+        existingQuotationId = existingQuotations.first.id;
       }
-    } else {
-      // First time downloading, generate new number
-      quotationNumber = await _generateUniqueQuotationNumber();
-      _lastDownloadedQuotationNumber = quotationNumber;
     }
     
     // Download PDF
