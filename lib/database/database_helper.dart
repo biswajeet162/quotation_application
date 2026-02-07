@@ -48,7 +48,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       dbPath,
-      version: 10,
+      version: 11,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -83,7 +83,10 @@ class DatabaseHelper {
         mobileNumber $textType,
         createdBy TEXT,
         createdAt TEXT NOT NULL,
-        lastLoginTime TEXT
+        lastLoginTime TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
+        sync_status TEXT NOT NULL DEFAULT 'SYNCED',
+        updatedAt TEXT NOT NULL
       )
     ''');
 
@@ -94,7 +97,10 @@ class DatabaseHelper {
         address $textType,
         mobile $textType,
         email $textType,
-        createdAt TEXT NOT NULL
+        createdAt TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        sync_status TEXT NOT NULL DEFAULT 'SYNCED',
+        updatedAt TEXT NOT NULL
       )
     ''');
 
@@ -113,7 +119,10 @@ class DatabaseHelper {
         grandTotal $realType,
         action $textType,
         createdBy $textType,
-        createdAt TEXT NOT NULL
+        createdAt TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        sync_status TEXT NOT NULL DEFAULT 'SYNCED',
+        updatedAt TEXT NOT NULL
       )
     ''');
 
@@ -125,7 +134,9 @@ class DatabaseHelper {
         mobile $textType,
         email $textType,
         gstin TEXT,
-        updatedAt TEXT NOT NULL
+        updatedAt TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
+        sync_status TEXT NOT NULL DEFAULT 'SYNCED'
       )
     ''');
 
@@ -387,11 +398,59 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 11) {
+      // Add sync fields to all synced tables
+      final now = DateTime.now().toIso8601String();
+      
+      // Add to users table
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
+        await db.execute('ALTER TABLE users ADD COLUMN sync_status TEXT NOT NULL DEFAULT \'SYNCED\'');
+        await db.execute('ALTER TABLE users ADD COLUMN updatedAt TEXT NOT NULL DEFAULT \'$now\'');
+        // Update existing records
+        await db.execute('UPDATE users SET updatedAt = createdAt WHERE updatedAt IS NULL OR updatedAt = \'\'');
+      } catch (e) {
+        debugPrint('Error adding sync fields to users: $e');
+      }
+      
+      // Add to companies table
+      try {
+        await db.execute('ALTER TABLE companies ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
+        await db.execute('ALTER TABLE companies ADD COLUMN sync_status TEXT NOT NULL DEFAULT \'SYNCED\'');
+        await db.execute('ALTER TABLE companies ADD COLUMN updatedAt TEXT NOT NULL DEFAULT \'$now\'');
+        // Update existing records
+        await db.execute('UPDATE companies SET updatedAt = createdAt WHERE updatedAt IS NULL OR updatedAt = \'\'');
+      } catch (e) {
+        debugPrint('Error adding sync fields to companies: $e');
+      }
+      
+      // Add to quotations_history table
+      try {
+        await db.execute('ALTER TABLE quotations_history ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
+        await db.execute('ALTER TABLE quotations_history ADD COLUMN sync_status TEXT NOT NULL DEFAULT \'SYNCED\'');
+        await db.execute('ALTER TABLE quotations_history ADD COLUMN updatedAt TEXT NOT NULL DEFAULT \'$now\'');
+        // Update existing records
+        await db.execute('UPDATE quotations_history SET updatedAt = createdAt WHERE updatedAt IS NULL OR updatedAt = \'\'');
+      } catch (e) {
+        debugPrint('Error adding sync fields to quotations_history: $e');
+      }
+      
+      // Add to my_company table
+      try {
+        await db.execute('ALTER TABLE my_company ADD COLUMN version INTEGER NOT NULL DEFAULT 1');
+        await db.execute('ALTER TABLE my_company ADD COLUMN sync_status TEXT NOT NULL DEFAULT \'SYNCED\'');
+        // Update existing records
+        await db.execute('UPDATE my_company SET updatedAt = updatedAt WHERE updatedAt IS NOT NULL');
+      } catch (e) {
+        debugPrint('Error adding sync fields to my_company: $e');
+      }
+    }
   }
 
   Future<void> _createDefaultAdmin(Database db) async {
     try {
       final adminPassword = _hashPassword('Admin');
+      final now = DateTime.now().toIso8601String();
       await db.insert('users', {
         'email': 'admin@gmail.com',
         'password': adminPassword,
@@ -399,8 +458,11 @@ class DatabaseHelper {
         'name': 'Administrator',
         'mobileNumber': '',
         'createdBy': null,
-        'createdAt': DateTime.now().toIso8601String(),
+        'createdAt': now,
         'lastLoginTime': null,
+        'version': 1,
+        'sync_status': 'SYNCED',
+        'updatedAt': now,
       });
     } catch (e) {
       // Admin user might already exist, ignore error
@@ -575,6 +637,7 @@ class DatabaseHelper {
   ) async {
     final db = await database;
     final hashedPassword = _hashPassword(password);
+    final now = DateTime.now().toIso8601String();
     return await db.insert('users', {
       'email': email,
       'password': hashedPassword,
@@ -582,8 +645,11 @@ class DatabaseHelper {
       'name': name,
       'mobileNumber': mobileNumber,
       'createdBy': createdBy,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': now,
       'lastLoginTime': null,
+      'version': 1,
+      'sync_status': 'PENDING',
+      'updatedAt': now,
     });
   }
 
@@ -621,7 +687,12 @@ class DatabaseHelper {
   // Company management methods
   Future<int> insertCompany(Company company) async {
     final db = await database;
-    return await db.insert('companies', company.toMap());
+    final map = company.toMap();
+    final now = DateTime.now().toIso8601String();
+    map['version'] = 1;
+    map['sync_status'] = 'PENDING';
+    map['updatedAt'] = now;
+    return await db.insert('companies', map);
   }
 
   Future<List<Company>> getAllCompanies() async {
@@ -647,9 +718,19 @@ class DatabaseHelper {
 
   Future<int> updateCompany(Company company) async {
     final db = await database;
+    final map = company.toMap();
+    final now = DateTime.now().toIso8601String();
+    
+    final current = await db.query('companies', where: 'id = ?', whereArgs: [company.id]);
+    final currentVersion = current.isNotEmpty ? (current.first['version'] as int? ?? 1) : 1;
+    
+    map['version'] = currentVersion + 1;
+    map['sync_status'] = 'PENDING';
+    map['updatedAt'] = now;
+    
     return await db.update(
       'companies',
-      company.toMap(),
+      map,
       where: 'id = ?',
       whereArgs: [company.id],
     );
@@ -696,6 +777,9 @@ class DatabaseHelper {
       whereArgs: [1],
     );
 
+    final now = DateTime.now().toIso8601String();
+    final currentVersion = existing.isNotEmpty ? (existing.first['version'] as int? ?? 1) : 1;
+    
     final data = {
       'id': 1,
       'name': name,
@@ -703,7 +787,9 @@ class DatabaseHelper {
       'mobile': mobile,
       'email': email,
       'gstin': gstin ?? '',
-      'updatedAt': DateTime.now().toIso8601String(),
+      'updatedAt': now,
+      'version': existing.isEmpty ? 1 : currentVersion + 1,
+      'sync_status': 'PENDING',
     };
 
     if (existing.isEmpty) {
@@ -724,7 +810,12 @@ class DatabaseHelper {
   Future<int> insertQuotationHistory(QuotationHistory quotationHistory) async {
     final db = await database;
     try {
-      return await db.insert('quotations_history', quotationHistory.toMap());
+      final map = quotationHistory.toMap();
+      final now = DateTime.now().toIso8601String();
+      map['version'] = 1;
+      map['sync_status'] = 'PENDING';
+      map['updatedAt'] = now;
+      return await db.insert('quotations_history', map);
     } catch (e) {
       // If error is due to missing createdBy column, try to add it and retry
       if (e.toString().contains('createdBy') || e.toString().contains('no such column')) {
@@ -738,7 +829,12 @@ class DatabaseHelper {
             await db.update('quotations_history', {'createdBy': 'Unknown'}, where: 'createdBy IS NULL');
           }
           // Retry insert
-          return await db.insert('quotations_history', quotationHistory.toMap());
+          final map = quotationHistory.toMap();
+          final now = DateTime.now().toIso8601String();
+          map['version'] = 1;
+          map['sync_status'] = 'PENDING';
+          map['updatedAt'] = now;
+          return await db.insert('quotations_history', map);
         } catch (e2) {
           debugPrint('Error inserting quotation history after migration: $e2');
           rethrow;
@@ -827,8 +923,16 @@ class DatabaseHelper {
 
   Future<int> updateQuotationHistoryAction(int id, String action, {DateTime? updatedAt}) async {
     final db = await database;
+    final now = DateTime.now().toIso8601String();
+    
+    final current = await db.query('quotations_history', where: 'id = ?', whereArgs: [id]);
+    final currentVersion = current.isNotEmpty ? (current.first['version'] as int? ?? 1) : 1;
+    
     final updateData = <String, dynamic>{
       'action': action,
+      'version': currentVersion + 1,
+      'sync_status': 'PENDING',
+      'updatedAt': updatedAt?.toIso8601String() ?? now,
     };
     
     // Update createdAt timestamp if provided
