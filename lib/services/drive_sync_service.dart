@@ -210,7 +210,6 @@ class DriveSyncService {
 
     final fileMetadata = drive.File();
     fileMetadata.name = fileName;
-    fileMetadata.parents = [folderId];
 
     final media = drive.Media(
       Stream.fromIterable([utf8.encode(json)]),
@@ -219,8 +218,11 @@ class DriveSyncService {
     );
 
     if (fileId != null) {
+      // Don't set parents when updating - it's not writable in update requests
       await driveApi.files.update(fileMetadata, fileId, uploadMedia: media);
     } else {
+      // Only set parents when creating a new file
+      fileMetadata.parents = [folderId];
       await driveApi.files.create(fileMetadata, uploadMedia: media);
     }
   }

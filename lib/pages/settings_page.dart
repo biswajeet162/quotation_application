@@ -49,10 +49,12 @@ class _SettingsPageState extends State<SettingsPage> {
     final isSignedIn = googleAuth.isSignedIn;
     final account = googleAuth.currentUser;
     
+    // For desktop, we don't have account email from google_sign_in
+    // We'll show authenticated status only
     if (mounted) {
       setState(() {
         _isAuthenticated = isSignedIn;
-        _googleAccountEmail = account?.email;
+        _googleAccountEmail = account?.email ?? (isSignedIn ? 'Authenticated' : null);
       });
     }
   }
@@ -86,22 +88,42 @@ class _SettingsPageState extends State<SettingsPage> {
           const SnackBar(
             content: Text('Successfully signed in to Google Drive'),
             backgroundColor: Colors.green,
-          ),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to sign in to Google Drive'),
-            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        final errorMessage = e.toString().replaceAll('Exception: ', '');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Failed to sign in to Google Drive',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  errorMessage,
+                  style: const TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Note: Make sure you have configured OAuth 2.0 Client ID in Google Cloud Console for desktop application.',
+                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Dismiss',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
           ),
         );
       }
@@ -172,6 +194,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
+    final isAdmin = authService.isAdmin;
 
     return Scaffold(
       body: Column(
@@ -306,24 +329,26 @@ class _SettingsPageState extends State<SettingsPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                Card(
-                  child: ExpansionTile(
-                    leading: Icon(
-                      _isAuthenticated ? Icons.cloud_done : Icons.cloud_off,
-                      color: _isAuthenticated ? Colors.green : Colors.grey,
-                    ),
-                    title: const Text('Google Drive Sync'),
-                    subtitle: Text(
-                      _isAuthenticated
-                          ? (_googleAccountEmail ?? 'Connected')
-                          : 'Not connected',
-                      style: TextStyle(
+                // Google Drive Sync - Admin Only
+                if (isAdmin) ...[
+                  const SizedBox(height: 16),
+                  Card(
+                    child: ExpansionTile(
+                      leading: Icon(
+                        _isAuthenticated ? Icons.cloud_done : Icons.cloud_off,
                         color: _isAuthenticated ? Colors.green : Colors.grey,
-                        fontWeight: FontWeight.w500,
                       ),
-                    ),
-                    children: [
+                      title: const Text('Google Drive Sync'),
+                      subtitle: Text(
+                        _isAuthenticated
+                            ? (_googleAccountEmail ?? 'Connected')
+                            : 'Not connected',
+                        style: TextStyle(
+                          color: _isAuthenticated ? Colors.green : Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      children: [
                       Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
@@ -376,7 +401,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             const Divider(),
                             const SizedBox(height: 16),
                             // Action Buttons
-                            if (!_isAuthenticated)
+                            if (!_isAuthenticated) ...[
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
@@ -395,7 +420,21 @@ class _SettingsPageState extends State<SettingsPage> {
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                   ),
                                 ),
-                              )
+                              ),
+                              const SizedBox(height: 12),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text(
+                                  'This will open Chrome with your logged-in Gmail account and ask for consent to access Google Drive. After granting consent, the application will be able to push data to Google Drive.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ]
                             else
                               SizedBox(
                                 width: double.infinity,
@@ -415,6 +454,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ],
                   ),
                 ),
+                ],
                 const SizedBox(height: 16),
                 Card(
                   child: ListTile(

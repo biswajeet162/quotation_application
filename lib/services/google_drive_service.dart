@@ -174,7 +174,6 @@ class GoogleDriveService {
 
     final fileMetadata = drive.File();
     fileMetadata.name = fileName;
-    fileMetadata.parents = [folderId];
 
     final media = drive.Media(
       Stream.fromIterable([utf8.encode(content)]),
@@ -183,6 +182,7 @@ class GoogleDriveService {
     );
 
     if (fileId != null) {
+      // Don't set parents when updating - it's not writable in update requests
       final updated = await _driveApi!.files.update(
         fileMetadata,
         fileId,
@@ -190,6 +190,8 @@ class GoogleDriveService {
       );
       return updated.id!;
     } else {
+      // Only set parents when creating a new file
+      fileMetadata.parents = [folderId];
       final created = await _driveApi!.files.create(
         fileMetadata,
         uploadMedia: media,

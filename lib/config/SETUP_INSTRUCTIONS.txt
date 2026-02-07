@@ -1,0 +1,49 @@
+═══════════════════════════════════════════════════════════════
+  QUICK SETUP - WHERE TO PUT VALUES
+═══════════════════════════════════════════════════════════════
+
+📍 FILE TO EDIT:
+   lib/config/oauth_config.dart
+
+🔑 WHAT VALUE YOU NEED:
+   OAuth 2.0 Client ID (from Google Cloud Console)
+
+📥 HOW TO GET IT:
+   1. Go to: https://console.cloud.google.com/
+   2. Create/Select Project
+   3. Enable "Google Drive API"
+   4. Go to "APIs & Services" → "OAuth consent screen"
+      - Choose "External"
+      - Add scope: drive.file
+      - Add your email as test user
+   5. Go to "APIs & Services" → "Credentials"
+   6. Click "Create Credentials" → "OAuth client ID"
+   7. Choose "Desktop app"
+   8. COPY THE CLIENT ID (looks like: 123456-abc...xyz.apps.googleusercontent.com)
+   9. Add redirect URI: http://localhost:8080/callback
+
+✏️ WHERE TO PUT IT:
+   Open: lib/config/oauth_config.dart
+   Find line 14:
+      static const String clientId = 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com';
+   
+   Replace with your Client ID:
+      static const String clientId = 'YOUR_ACTUAL_CLIENT_ID_HERE.apps.googleusercontent.com';
+   
+   Save the file!
+
+═══════════════════════════════════════════════════════════════
+  EXAMPLE
+═══════════════════════════════════════════════════════════════
+
+If your Client ID from Google is:
+   987654321-xyz123abc.apps.googleusercontent.com
+
+Then in oauth_config.dart, change:
+   static const String clientId = 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com';
+   
+To:
+   static const String clientId = '987654321-xyz123abc.apps.googleusercontent.com';
+
+═══════════════════════════════════════════════════════════════
+

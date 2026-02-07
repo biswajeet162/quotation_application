@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
 import 'secure_storage_service.dart';
+import 'desktop_oauth_service.dart';
 
 class GoogleAuthService {
   static final GoogleAuthService instance = GoogleAuthService._init();
@@ -17,8 +19,16 @@ class GoogleAuthService {
     'https://www.googleapis.com/auth/drive.file',
   ];
 
+  // TODO: Replace with your OAuth 2.0 Client ID from Google Cloud Console
+  // Get it from: https://console.cloud.google.com/apis/credentials
+  // Application type: Desktop app
+  // 
+  // For now, leaving it empty - google_sign_in will try to use default configuration
+  // If sign-in fails, you MUST add your Client ID here
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: _scopes,
+    // Uncomment and add your Client ID when you get it from Google Cloud Console:
+    // clientId: 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com',
   );
 
   GoogleSignInAccount? _currentUser;
@@ -26,38 +36,62 @@ class GoogleAuthService {
   DateTime? _tokenExpiry;
 
   GoogleSignInAccount? get currentUser => _currentUser;
-  bool get isSignedIn => _currentUser != null;
+  bool get isSignedIn {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      return DesktopOAuthService.instance.isSignedIn;
+    }
+    return _currentUser != null;
+  }
   String? get accessToken => _accessToken;
 
   Future<bool> signIn() async {
     try {
-      final account = await _googleSignIn.signIn();
-      if (account == null) {
+      // Use desktop OAuth for Windows/Linux/macOS, google_sign_in for mobile
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        final success = await DesktopOAuthService.instance.signIn();
+        if (success) {
+          _accessToken = DesktopOAuthService.instance.accessToken;
+          final verified = await verifyDriveAccess();
+          if (!verified) {
+            throw Exception('Failed to verify Google Drive access. Please check permissions.');
+          }
+          return true;
+        }
         return false;
+      } else {
+        // Mobile platforms use google_sign_in
+        final account = await _googleSignIn.signIn();
+        if (account == null) {
+          throw Exception('Sign-in was cancelled by user');
+        }
+
+        _currentUser = account;
+        final auth = await account.authentication;
+
+        if (auth.accessToken == null) {
+          throw Exception('Failed to obtain access token. Please check OAuth configuration.');
+        }
+
+        _accessToken = auth.accessToken;
+        _tokenExpiry = DateTime.now().add(const Duration(hours: 1));
+
+        await _storage.write(key: _accessTokenKey, value: _accessToken);
+        if (auth.idToken != null) {
+          await _storage.write(key: _refreshTokenKey, value: auth.idToken);
+        }
+        await _storage.write(
+          key: _expiryKey,
+          value: _tokenExpiry!.toIso8601String(),
+        );
+
+        final verified = await verifyDriveAccess();
+        if (!verified) {
+          throw Exception('Failed to verify Google Drive access. Please check permissions.');
+        }
+        return true;
       }
-
-      _currentUser = account;
-      final auth = await account.authentication;
-
-      if (auth.accessToken == null) {
-        return false;
-      }
-
-      _accessToken = auth.accessToken;
-      _tokenExpiry = DateTime.now().add(const Duration(hours: 1));
-
-      await _storage.write(key: _accessTokenKey, value: _accessToken);
-      if (auth.idToken != null) {
-        await _storage.write(key: _refreshTokenKey, value: auth.idToken);
-      }
-      await _storage.write(
-        key: _expiryKey,
-        value: _tokenExpiry!.toIso8601String(),
-      );
-
-      return await verifyDriveAccess();
     } catch (e) {
-      return false;
+      rethrow;
     }
   }
 
@@ -95,10 +129,14 @@ class GoogleAuthService {
 
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
-      await _storage.delete(key: _accessTokenKey);
-      await _storage.delete(key: _refreshTokenKey);
-      await _storage.delete(key: _expiryKey);
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        await DesktopOAuthService.instance.signOut();
+      } else {
+        await _googleSignIn.signOut();
+        await _storage.delete(key: _accessTokenKey);
+        await _storage.delete(key: _refreshTokenKey);
+        await _storage.delete(key: _expiryKey);
+      }
       _currentUser = null;
       _accessToken = null;
       _tokenExpiry = null;
@@ -109,28 +147,32 @@ class GoogleAuthService {
 
   Future<bool> loadStoredTokens() async {
     try {
-      final storedToken = await _storage.read(key: _accessTokenKey);
-      final storedExpiry = await _storage.read(key: _expiryKey);
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        return await DesktopOAuthService.instance.loadStoredTokens();
+      } else {
+        final storedToken = await _storage.read(key: _accessTokenKey);
+        final storedExpiry = await _storage.read(key: _expiryKey);
 
-      if (storedToken == null || storedExpiry == null) {
+        if (storedToken == null || storedExpiry == null) {
+          return false;
+        }
+
+        final expiry = DateTime.parse(storedExpiry);
+        if (expiry.isBefore(DateTime.now())) {
+          return await refreshToken();
+        }
+
+        _accessToken = storedToken;
+        _tokenExpiry = expiry;
+
+        final account = await _googleSignIn.signInSilently();
+        if (account != null) {
+          _currentUser = account;
+          return await verifyDriveAccess();
+        }
+
         return false;
       }
-
-      final expiry = DateTime.parse(storedExpiry);
-      if (expiry.isBefore(DateTime.now())) {
-        return await refreshToken();
-      }
-
-      _accessToken = storedToken;
-      _tokenExpiry = expiry;
-
-      final account = await _googleSignIn.signInSilently();
-      if (account != null) {
-        _currentUser = account;
-        return await verifyDriveAccess();
-      }
-
-      return false;
     } catch (e) {
       return false;
     }
@@ -168,6 +210,10 @@ class GoogleAuthService {
   }
 
   Future<String?> getValidAccessToken() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      return await DesktopOAuthService.instance.getValidAccessToken();
+    }
+    
     if (_accessToken == null || _tokenExpiry == null) {
       final loaded = await loadStoredTokens();
       if (!loaded) {
