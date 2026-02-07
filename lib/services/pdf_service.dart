@@ -65,32 +65,24 @@ class PdfService {
       );
       
       // Create subsequent pages if needed - ensure all items are included
+      // Try to fit totals and T&C on the same page as the last items if space allows
       if (items.length > itemsPerPageFirst) {
         int currentIndex = itemsPerPageFirst;
+        bool totalsShown = false;
         
+        // Create pages for all remaining items
         while (currentIndex < items.length) {
           // Calculate remaining items
           int remainingItems = items.length - currentIndex;
-          bool isLastPage = false;
           int endIndex;
+          bool isLastPage = false;
           
-          // Check if this will be the last page
+          // Check if this is the last page
           if (remainingItems <= itemsPerPageSubsequent) {
-            // This is the last page - reserve space for totals and T&C
-            int maxItemsOnLastPage = itemsPerPageSubsequent - reservedRowsForTotals;
-            if (remainingItems > maxItemsOnLastPage) {
-              // Too many items for last page with totals - split them
-              endIndex = currentIndex + maxItemsOnLastPage;
-              isLastPage = false; // Will create another page for remaining items
-            } else {
-              // All remaining items fit with space for totals
-              endIndex = items.length;
-              isLastPage = true;
-            }
+            endIndex = items.length;
+            isLastPage = true;
           } else {
-            // Not the last page - use full capacity
             endIndex = currentIndex + itemsPerPageSubsequent;
-            isLastPage = false;
           }
           
           // Ensure we have valid indices
@@ -102,7 +94,12 @@ class PdfService {
           final pageStartIndex = currentIndex;
           final pageEndIndex = endIndex;
           final pageItems = items.sublist(pageStartIndex, pageEndIndex);
-          final isActuallyLastPage = (pageEndIndex >= items.length);
+          final isLastPageFinal = isLastPage;
+          
+          // Check if there's space for totals on the last page
+          // If last page has fewer items than capacity, there's likely space
+          bool showTotalsOnThisPage = isLastPageFinal && 
+                                      (remainingItems < itemsPerPageSubsequent - reservedRowsForTotals);
           
           pdf.addPage(
             pw.Page(
@@ -112,7 +109,7 @@ class PdfService {
                 return _buildSubsequentPage(
                   items: pageItems,
                   startItemNumber: pageStartIndex + 1,
-                  showTotals: isActuallyLastPage,
+                  showTotals: showTotalsOnThisPage,
                   totalAmount: totalAmount,
                   totalGstAmount: totalGstAmount,
                   grandTotal: grandTotal,
@@ -121,7 +118,34 @@ class PdfService {
             ),
           );
           
+          if (showTotalsOnThisPage) {
+            totalsShown = true;
+          }
+          
           currentIndex = pageEndIndex;
+        }
+        
+        // Only create a separate page for totals if they weren't shown on the last items page
+        if (!totalsShown) {
+          pdf.addPage(
+            pw.Page(
+              pageFormat: PdfPageFormat.a4.landscape,
+              margin: const pw.EdgeInsets.all(30),
+              build: (pw.Context context) {
+                return pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.SizedBox(height: 40), // Top margin for subsequent page
+                    _buildTotalsAndTermsRow(
+                      totalAmount: totalAmount,
+                      totalGstAmount: totalGstAmount,
+                      grandTotal: grandTotal,
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
         }
       }
 
@@ -296,32 +320,24 @@ class PdfService {
     );
     
     // Create subsequent pages if needed - ensure all items are included
+    // Try to fit totals and T&C on the same page as the last items if space allows
     if (items.length > itemsPerPageFirst) {
       int currentIndex = itemsPerPageFirst;
+      bool totalsShown = false;
       
+      // Create pages for all remaining items
       while (currentIndex < items.length) {
         // Calculate remaining items
         int remainingItems = items.length - currentIndex;
-        bool isLastPage = false;
         int endIndex;
+        bool isLastPage = false;
         
-        // Check if this will be the last page
+        // Check if this is the last page
         if (remainingItems <= itemsPerPageSubsequent) {
-          // This is the last page - reserve space for totals and T&C
-          int maxItemsOnLastPage = itemsPerPageSubsequent - reservedRowsForTotals;
-          if (remainingItems > maxItemsOnLastPage) {
-            // Too many items for last page with totals - split them
-            endIndex = currentIndex + maxItemsOnLastPage;
-            isLastPage = false; // Will create another page for remaining items
-          } else {
-            // All remaining items fit with space for totals
-            endIndex = items.length;
-            isLastPage = true;
-          }
+          endIndex = items.length;
+          isLastPage = true;
         } else {
-          // Not the last page - use full capacity
           endIndex = currentIndex + itemsPerPageSubsequent;
-          isLastPage = false;
         }
         
         // Ensure we have valid indices
@@ -333,7 +349,12 @@ class PdfService {
         final pageStartIndex = currentIndex;
         final pageEndIndex = endIndex;
         final pageItems = items.sublist(pageStartIndex, pageEndIndex);
-        final isActuallyLastPage = (pageEndIndex >= items.length);
+        final isLastPageFinal = isLastPage;
+        
+        // Check if there's space for totals on the last page
+        // If last page has fewer items than capacity, there's likely space
+        bool showTotalsOnThisPage = isLastPageFinal && 
+                                    (remainingItems < itemsPerPageSubsequent - reservedRowsForTotals);
         
         pdf.addPage(
           pw.Page(
@@ -343,7 +364,7 @@ class PdfService {
               return _buildSubsequentPage(
                 items: pageItems,
                 startItemNumber: pageStartIndex + 1,
-                showTotals: isActuallyLastPage,
+                showTotals: showTotalsOnThisPage,
                 totalAmount: totalAmount,
                 totalGstAmount: totalGstAmount,
                 grandTotal: grandTotal,
@@ -352,7 +373,34 @@ class PdfService {
           ),
         );
         
+        if (showTotalsOnThisPage) {
+          totalsShown = true;
+        }
+        
         currentIndex = pageEndIndex;
+      }
+      
+      // Only create a separate page for totals if they weren't shown on the last items page
+      if (!totalsShown) {
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4.landscape,
+            margin: const pw.EdgeInsets.all(30),
+            build: (pw.Context context) {
+              return pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.SizedBox(height: 40), // Top margin for subsequent page
+                  _buildTotalsAndTermsRow(
+                    totalAmount: totalAmount,
+                    totalGstAmount: totalGstAmount,
+                    grandTotal: grandTotal,
+                  ),
+                ],
+              );
+            },
+          ),
+        );
       }
     }
     
@@ -388,13 +436,11 @@ class PdfService {
         _buildTableWithRows(items: items, startItemNumber: 1),
         if (showTotals) ...[
           pw.SizedBox(height: 16),
-          _buildTotalsSection(
+          _buildTotalsAndTermsRow(
             totalAmount: totalAmount,
             totalGstAmount: totalGstAmount,
             grandTotal: grandTotal,
           ),
-          pw.SizedBox(height: 16),
-          _buildTermsSection(),
         ],
       ],
     );
@@ -418,13 +464,11 @@ class PdfService {
         _buildTableWithRows(items: items, startItemNumber: startItemNumber),
         if (showTotals) ...[
           pw.SizedBox(height: 16),
-          _buildTotalsSection(
+          _buildTotalsAndTermsRow(
             totalAmount: totalAmount,
             totalGstAmount: totalGstAmount,
             grandTotal: grandTotal,
           ),
-          pw.SizedBox(height: 16),
-          _buildTermsSection(),
         ],
       ],
     );
@@ -727,6 +771,34 @@ class PdfService {
         pw.Text(
           'Lorem Ipsum Doler Sit Amet',
           style: const pw.TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  /// Builds totals and terms side by side on the same horizontal line
+  static pw.Widget _buildTotalsAndTermsRow({
+    required double totalAmount,
+    required double totalGstAmount,
+    required double grandTotal,
+  }) {
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        // Terms and Conditions on the left
+        pw.Expanded(
+          flex: 2,
+          child: _buildTermsSection(),
+        ),
+        pw.SizedBox(width: 20), // Spacing between terms and totals
+        // Totals on the right
+        pw.Expanded(
+          flex: 1,
+          child: _buildTotalsSection(
+            totalAmount: totalAmount,
+            totalGstAmount: totalGstAmount,
+            grandTotal: grandTotal,
+          ),
         ),
       ],
     );
