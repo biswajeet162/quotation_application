@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/drive_sync_service.dart';
+import '../services/auto_sync_service.dart';
 
 class PageHeader extends StatefulWidget {
   final String title;
@@ -23,7 +24,44 @@ class PageHeader extends StatefulWidget {
 }
 
 class _PageHeaderState extends State<PageHeader> {
-  bool _isSyncing = false;
+  bool _isPulling = false;
+  bool _isPushing = false;
+  int _pushCount = 0;
+  int _pullCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to auto-sync state changes
+    AutoSyncService.instance.onPushStateChanged = () {
+      if (mounted) {
+        setState(() {
+          _isPushing = AutoSyncService.instance.isPushing;
+          _pushCount = AutoSyncService.instance.pushCount;
+        });
+      }
+    };
+    AutoSyncService.instance.onPullStateChanged = () {
+      if (mounted) {
+        setState(() {
+          _isPulling = AutoSyncService.instance.isPulling;
+          _pullCount = AutoSyncService.instance.pullCount;
+        });
+      }
+    };
+    // Initialize state
+    _isPushing = AutoSyncService.instance.isPushing;
+    _isPulling = AutoSyncService.instance.isPulling;
+    _pushCount = AutoSyncService.instance.pushCount;
+    _pullCount = AutoSyncService.instance.pullCount;
+  }
+
+  @override
+  void dispose() {
+    AutoSyncService.instance.onPushStateChanged = null;
+    AutoSyncService.instance.onPullStateChanged = null;
+    super.dispose();
+  }
 
   Future<void> _syncNow() async {
     final isAuthenticated = GoogleAuthService.instance.isSignedIn;
@@ -39,46 +77,20 @@ class _PageHeaderState extends State<PageHeader> {
       return;
     }
 
-    setState(() => _isSyncing = true);
-    try {
-      final result = await DriveSyncService.instance.syncAll();
-      if (mounted) {
-        if (result.success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Sync completed!\n'
-                'Users: ${result.usersSynced} synced, ${result.usersDownloaded} downloaded\n'
-                'Companies: ${result.companiesSynced} synced, ${result.companiesDownloaded} downloaded\n'
-                'Quotations: ${result.quotationsSynced} synced, ${result.quotationsDownloaded} downloaded',
-              ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Sync completed with errors: ${result.errors.join(", ")}'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sync failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSyncing = false);
-      }
+    // Trigger immediate pull
+    await AutoSyncService.instance.performPull();
+    
+    if (mounted) {
+      final pullCount = AutoSyncService.instance.pullCount;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(pullCount > 0 
+              ? 'Sync completed! Downloaded $pullCount item(s).'
+              : 'Sync completed!'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -131,24 +143,97 @@ class _PageHeaderState extends State<PageHeader> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Sync Button
-                    IconButton(
-                      icon: _isSyncing
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                    // PUSH Icon (Red) - Shows when data is being pushed
+                    Tooltip(
+                      message: _isPushing 
+                          ? 'Pushing $_pushCount item(s) to Google Drive...' 
+                          : 'PUSH: Auto-uploads changes',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _isPushing
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.sync,
+                                  color: Colors.grey,
+                                  size: 20,
+                                ),
+                          if (_isPushing && _pushCount > 0) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                            )
-                          : Icon(
-                              Icons.sync,
-                              color: isGoogleAuthenticated ? Colors.green : Colors.grey,
+                              child: Text(
+                                '$_pushCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                      tooltip: isGoogleAuthenticated ? 'Sync with Google Drive' : 'Sign in to Google Drive in Settings',
-                      onPressed: _isSyncing ? null : _syncNow,
+                          ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
+                    // PULL Icon (Green) - Shows when data is being pulled
+                    Tooltip(
+                      message: _isPulling 
+                          ? 'Pulling $_pullCount item(s) from Google Drive...' 
+                          : 'PULL: Fetch updates (click to sync now)',
+                      child: GestureDetector(
+                        onTap: _isPulling ? null : _syncNow,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _isPulling
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.sync,
+                                    color: Colors.grey,
+                                    size: 20,
+                                  ),
+                            if (_isPulling && _pullCount > 0) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$_pullCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     // Logout Button
                     IconButton(
                       icon: const Icon(Icons.logout),

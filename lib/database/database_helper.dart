@@ -9,6 +9,7 @@ import '../models/product.dart';
 import '../models/user.dart';
 import '../models/company.dart';
 import '../models/quotation_history.dart';
+import '../services/auto_sync_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -638,7 +639,7 @@ class DatabaseHelper {
     final db = await database;
     final hashedPassword = _hashPassword(password);
     final now = DateTime.now().toIso8601String();
-    return await db.insert('users', {
+    final id = await db.insert('users', {
       'email': email,
       'password': hashedPassword,
       'role': role,
@@ -651,6 +652,9 @@ class DatabaseHelper {
       'sync_status': 'PENDING',
       'updatedAt': now,
     });
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'users', recordId: id);
+    return id;
   }
 
   Future<int> updateUserPassword(int userId, String newPassword) async {
@@ -677,11 +681,14 @@ class DatabaseHelper {
     if (user.isNotEmpty && user.first['email'] == 'admin@gmail.com') {
       throw Exception('Cannot delete the default admin user');
     }
-    return await db.delete(
+    final result = await db.delete(
       'users',
       where: 'id = ?',
       whereArgs: [id],
     );
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'users', recordId: id);
+    return result;
   }
 
   // Company management methods
@@ -692,7 +699,10 @@ class DatabaseHelper {
     map['version'] = 1;
     map['sync_status'] = 'PENDING';
     map['updatedAt'] = now;
-    return await db.insert('companies', map);
+    final id = await db.insert('companies', map);
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'companies', recordId: id);
+    return id;
   }
 
   Future<List<Company>> getAllCompanies() async {
@@ -728,21 +738,27 @@ class DatabaseHelper {
     map['sync_status'] = 'PENDING';
     map['updatedAt'] = now;
     
-    return await db.update(
+    final result = await db.update(
       'companies',
       map,
       where: 'id = ?',
       whereArgs: [company.id],
     );
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'companies', recordId: company.id);
+    return result;
   }
 
   Future<int> deleteCompany(int id) async {
     final db = await database;
-    return await db.delete(
+    final result = await db.delete(
       'companies',
       where: 'id = ?',
       whereArgs: [id],
     );
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'companies', recordId: id);
+    return result;
   }
 
   // My Company management methods
@@ -804,6 +820,8 @@ class DatabaseHelper {
         whereArgs: [1],
       );
     }
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'my_company', recordId: 1);
   }
 
   // Quotation History management methods
@@ -815,7 +833,10 @@ class DatabaseHelper {
       map['version'] = 1;
       map['sync_status'] = 'PENDING';
       map['updatedAt'] = now;
-      return await db.insert('quotations_history', map);
+      final id = await db.insert('quotations_history', map);
+      // Trigger automatic push
+      AutoSyncService.instance.pushSingleRecord(table: 'quotations_history', recordId: id);
+      return id;
     } catch (e) {
       // If error is due to missing createdBy column, try to add it and retry
       if (e.toString().contains('createdBy') || e.toString().contains('no such column')) {
@@ -834,7 +855,10 @@ class DatabaseHelper {
           map['version'] = 1;
           map['sync_status'] = 'PENDING';
           map['updatedAt'] = now;
-          return await db.insert('quotations_history', map);
+          final id = await db.insert('quotations_history', map);
+          // Trigger automatic push
+          AutoSyncService.instance.pushSingleRecord(table: 'quotations_history', recordId: id);
+          return id;
         } catch (e2) {
           debugPrint('Error inserting quotation history after migration: $e2');
           rethrow;
@@ -940,21 +964,27 @@ class DatabaseHelper {
       updateData['createdAt'] = updatedAt.toIso8601String();
     }
     
-    return await db.update(
+    final result = await db.update(
       'quotations_history',
       updateData,
       where: 'id = ?',
       whereArgs: [id],
     );
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'quotations_history', recordId: id);
+    return result;
   }
 
   Future<int> deleteQuotationHistory(int id) async {
     final db = await database;
-    return await db.delete(
+    final result = await db.delete(
       'quotations_history',
       where: 'id = ?',
       whereArgs: [id],
     );
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'quotations_history', recordId: id);
+    return result;
   }
 
   Future<void> close() async {

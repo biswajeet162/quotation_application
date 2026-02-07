@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/google_drive_service.dart';
+import '../services/auto_sync_service.dart';
 import '../models/my_company.dart';
 import 'password_reset_page.dart';
 import 'package:intl/intl.dart';
@@ -84,6 +85,10 @@ class _SettingsPageState extends State<SettingsPage> {
       final success = await GoogleAuthService.instance.signIn();
       if (success && mounted) {
         await _checkAuthStatus();
+        // Start automatic pull after successful sign-in
+        AutoSyncService.instance.startAutoPull();
+        // Perform initial pull
+        AutoSyncService.instance.performPull();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Successfully signed in to Google Drive'),
@@ -134,6 +139,72 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _showPullIntervalDialog() async {
+    final currentMinutes = AutoSyncService.instance.pullInterval.inMinutes;
+    final controller = TextEditingController(text: currentMinutes.toString());
+    
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Configure Auto Pull Interval'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Set how often the app should automatically pull updates from Google Drive (in minutes).'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Interval (minutes)',
+                hintText: 'Enter number of minutes',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Minimum: 1 minute',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final minutes = int.tryParse(controller.text);
+              if (minutes != null && minutes >= 1) {
+                Navigator.of(context).pop(minutes);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a valid number (minimum 1)'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && mounted) {
+      AutoSyncService.instance.setPullInterval(Duration(minutes: result));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Auto pull interval set to $result minutes'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   Future<void> _signOutFromGoogle() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -161,6 +232,8 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() => _isLoading = true);
       try {
         await GoogleAuthService.instance.signOut();
+        // Stop automatic pull when signed out
+        AutoSyncService.instance.stopAutoPull();
         if (mounted) {
           await _checkAuthStatus();
           setState(() {
@@ -435,7 +508,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                               ),
                             ]
-                            else
+                            else ...[
                               SizedBox(
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
@@ -448,6 +521,44 @@ class _SettingsPageState extends State<SettingsPage> {
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 16),
+                              const Divider(),
+                              const SizedBox(height: 16),
+                              // Pull Interval Configuration
+                              Row(
+                                children: [
+                                  const Icon(Icons.schedule, size: 20, color: Colors.grey),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Auto Pull Interval',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${AutoSyncService.instance.pullInterval.inMinutes} minutes',
+                                          style: TextStyle(
+                                            color: Colors.grey[600],
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () => _showPullIntervalDialog(),
+                                    tooltip: 'Configure pull interval',
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                       ),

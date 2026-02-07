@@ -8,9 +8,12 @@ import 'pages/password_reset_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/companies_page.dart';
 import 'pages/quotation_history_page.dart';
+import 'pages/sync_logs_page.dart';
 import 'widgets/navigation_sidebar.dart';
 import 'widgets/page_header.dart';
 import 'services/auth_service.dart';
+import 'services/auto_sync_service.dart';
+import 'services/google_auth_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -65,6 +68,33 @@ class _MainScreenState extends State<MainScreen> {
   bool _hasQuotationData = false;
   final GlobalKey<QuotationHistoryPageState> _quotationHistoryKey = GlobalKey<QuotationHistoryPageState>();
 
+  @override
+  void initState() {
+    super.initState();
+    // Initialize auto-sync on app startup
+    _initializeAutoSync();
+  }
+
+  Future<void> _initializeAutoSync() async {
+    // Wait a bit for the app to fully initialize
+    await Future.delayed(const Duration(seconds: 2));
+    
+    // Check if Google Drive is authenticated
+    if (GoogleAuthService.instance.isSignedIn) {
+      // Start automatic pull timer
+      AutoSyncService.instance.startAutoPull();
+      
+      // Perform initial pull on app startup
+      AutoSyncService.instance.performPull();
+    }
+  }
+
+  @override
+  void dispose() {
+    AutoSyncService.instance.stopAutoPull();
+    super.dispose();
+  }
+
   List<Widget> _buildPages(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
     final isAdmin = authService.isAdmin;
@@ -77,10 +107,11 @@ class _MainScreenState extends State<MainScreen> {
       ),
       QuotationHistoryPage(key: _quotationHistoryKey),
       const CompaniesPage(),
+      const SyncLogsPage(),
       SettingsPage(userEmail: authService.currentUser?.email ?? ''),
     ];
 
-    // Insert user management page for admin (index 5, before Settings)
+    // Insert user management page for admin (index 5, before Sync Monitor)
     if (isAdmin) {
       pages.insert(5, const UserManagementPage());
     }
