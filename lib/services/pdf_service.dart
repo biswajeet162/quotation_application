@@ -32,19 +32,17 @@ class PdfService {
       // Create PDF document
       final pdf = pw.Document();
       
-      // Calculate items per page (approximately 8-10 items fit on first page after header)
-      const int itemsPerPageFirst = 8; // Items that fit on first page
-      const int itemsPerPageSubsequent = 12; // Items per subsequent page
+      // Calculate items per page dynamically based on available space
+      // First page has header, so fewer items. Subsequent pages can fit more.
+      // Reserve space for totals and T&C on the last page (approximately 5-6 rows worth)
+      const int itemsPerPageFirst = 8; // Items on first page (with header)
+      const int itemsPerPageSubsequent = 15; // Items per subsequent page (more space)
+      const int reservedRowsForTotals = 6; // Reserve space for totals and T&C sections
       
-      // Calculate number of pages needed
-      int totalPages = 1;
-      if (items.length > itemsPerPageFirst) {
-        int remainingItems = items.length - itemsPerPageFirst;
-        totalPages = 1 + ((remainingItems + itemsPerPageSubsequent - 1) ~/ itemsPerPageSubsequent);
-      }
+      // Create first page with header
+      int itemsToShowFirst = items.length > itemsPerPageFirst ? itemsPerPageFirst : items.length;
+      bool isFirstPageAlsoLast = (items.length <= itemsPerPageFirst);
       
-      // Page 1: Full header + quotation info + table header + first items
-      int itemsToShow = items.length > itemsPerPageFirst ? itemsPerPageFirst : items.length;
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.a4.landscape,
@@ -56,8 +54,8 @@ class PdfService {
               customerName: customerName,
               customerAddress: customerAddress,
               customerContact: customerContact,
-              items: items.sublist(0, itemsToShow),
-              showTotals: items.length <= itemsPerPageFirst,
+              items: items.sublist(0, itemsToShowFirst),
+              showTotals: isFirstPageAlsoLast,
               totalAmount: totalAmount,
               totalGstAmount: totalGstAmount,
               grandTotal: grandTotal,
@@ -66,16 +64,45 @@ class PdfService {
         ),
       );
       
-      // Subsequent pages: Top margin + table header + remaining items
+      // Create subsequent pages if needed - ensure all items are included
       if (items.length > itemsPerPageFirst) {
-        for (int pageNum = 2; pageNum <= totalPages; pageNum++) {
-          int startIndex = itemsPerPageFirst + (pageNum - 2) * itemsPerPageSubsequent;
-          int endIndex = startIndex + itemsPerPageSubsequent;
-          if (endIndex > items.length) {
-            endIndex = items.length;
+        int currentIndex = itemsPerPageFirst;
+        
+        while (currentIndex < items.length) {
+          // Calculate remaining items
+          int remainingItems = items.length - currentIndex;
+          bool isLastPage = false;
+          int endIndex;
+          
+          // Check if this will be the last page
+          if (remainingItems <= itemsPerPageSubsequent) {
+            // This is the last page - reserve space for totals and T&C
+            int maxItemsOnLastPage = itemsPerPageSubsequent - reservedRowsForTotals;
+            if (remainingItems > maxItemsOnLastPage) {
+              // Too many items for last page with totals - split them
+              endIndex = currentIndex + maxItemsOnLastPage;
+              isLastPage = false; // Will create another page for remaining items
+            } else {
+              // All remaining items fit with space for totals
+              endIndex = items.length;
+              isLastPage = true;
+            }
+          } else {
+            // Not the last page - use full capacity
+            endIndex = currentIndex + itemsPerPageSubsequent;
+            isLastPage = false;
           }
           
-          bool isLastPage = pageNum == totalPages;
+          // Ensure we have valid indices
+          if (currentIndex >= endIndex || currentIndex >= items.length) {
+            break;
+          }
+          
+          // Capture values for the closure
+          final pageStartIndex = currentIndex;
+          final pageEndIndex = endIndex;
+          final pageItems = items.sublist(pageStartIndex, pageEndIndex);
+          final isActuallyLastPage = (pageEndIndex >= items.length);
           
           pdf.addPage(
             pw.Page(
@@ -83,9 +110,9 @@ class PdfService {
               margin: const pw.EdgeInsets.all(30),
               build: (pw.Context context) {
                 return _buildSubsequentPage(
-                  items: items.sublist(startIndex, endIndex),
-                  startItemNumber: startIndex + 1,
-                  showTotals: isLastPage,
+                  items: pageItems,
+                  startItemNumber: pageStartIndex + 1,
+                  showTotals: isActuallyLastPage,
                   totalAmount: totalAmount,
                   totalGstAmount: totalGstAmount,
                   grandTotal: grandTotal,
@@ -93,6 +120,8 @@ class PdfService {
               },
             ),
           );
+          
+          currentIndex = pageEndIndex;
         }
       }
 
@@ -234,19 +263,17 @@ class PdfService {
   }) async {
     final pdf = pw.Document();
     
-    // Calculate items per page (approximately 8-10 items fit on first page after header)
-    const int itemsPerPageFirst = 8; // Items that fit on first page
-    const int itemsPerPageSubsequent = 12; // Items per subsequent page
+    // Calculate items per page dynamically based on available space
+    // First page has header, so fewer items. Subsequent pages can fit more.
+    // Reserve space for totals and T&C on the last page (approximately 5-6 rows worth)
+    const int itemsPerPageFirst = 8; // Items on first page (with header)
+    const int itemsPerPageSubsequent = 15; // Items per subsequent page (more space)
+    const int reservedRowsForTotals = 6; // Reserve space for totals and T&C sections
     
-    // Calculate number of pages needed
-    int totalPages = 1;
-    if (items.length > itemsPerPageFirst) {
-      int remainingItems = items.length - itemsPerPageFirst;
-      totalPages = 1 + ((remainingItems + itemsPerPageSubsequent - 1) ~/ itemsPerPageSubsequent);
-    }
+    // Create first page with header
+    int itemsToShowFirst = items.length > itemsPerPageFirst ? itemsPerPageFirst : items.length;
+    bool isFirstPageAlsoLast = (items.length <= itemsPerPageFirst);
     
-    // Page 1: Full header + quotation info + table header + first items
-    int itemsToShow = items.length > itemsPerPageFirst ? itemsPerPageFirst : items.length;
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4.landscape,
@@ -258,8 +285,8 @@ class PdfService {
             customerName: customerName,
             customerAddress: customerAddress,
             customerContact: customerContact,
-            items: items.sublist(0, itemsToShow),
-            showTotals: items.length <= itemsPerPageFirst,
+            items: items.sublist(0, itemsToShowFirst),
+            showTotals: isFirstPageAlsoLast,
             totalAmount: totalAmount,
             totalGstAmount: totalGstAmount,
             grandTotal: grandTotal,
@@ -268,16 +295,45 @@ class PdfService {
       ),
     );
     
-    // Subsequent pages: Top margin + table header + remaining items
+    // Create subsequent pages if needed - ensure all items are included
     if (items.length > itemsPerPageFirst) {
-      for (int pageNum = 2; pageNum <= totalPages; pageNum++) {
-        int startIndex = itemsPerPageFirst + (pageNum - 2) * itemsPerPageSubsequent;
-        int endIndex = startIndex + itemsPerPageSubsequent;
-        if (endIndex > items.length) {
-          endIndex = items.length;
+      int currentIndex = itemsPerPageFirst;
+      
+      while (currentIndex < items.length) {
+        // Calculate remaining items
+        int remainingItems = items.length - currentIndex;
+        bool isLastPage = false;
+        int endIndex;
+        
+        // Check if this will be the last page
+        if (remainingItems <= itemsPerPageSubsequent) {
+          // This is the last page - reserve space for totals and T&C
+          int maxItemsOnLastPage = itemsPerPageSubsequent - reservedRowsForTotals;
+          if (remainingItems > maxItemsOnLastPage) {
+            // Too many items for last page with totals - split them
+            endIndex = currentIndex + maxItemsOnLastPage;
+            isLastPage = false; // Will create another page for remaining items
+          } else {
+            // All remaining items fit with space for totals
+            endIndex = items.length;
+            isLastPage = true;
+          }
+        } else {
+          // Not the last page - use full capacity
+          endIndex = currentIndex + itemsPerPageSubsequent;
+          isLastPage = false;
         }
         
-        bool isLastPage = pageNum == totalPages;
+        // Ensure we have valid indices
+        if (currentIndex >= endIndex || currentIndex >= items.length) {
+          break;
+        }
+        
+        // Capture values for the closure
+        final pageStartIndex = currentIndex;
+        final pageEndIndex = endIndex;
+        final pageItems = items.sublist(pageStartIndex, pageEndIndex);
+        final isActuallyLastPage = (pageEndIndex >= items.length);
         
         pdf.addPage(
           pw.Page(
@@ -285,9 +341,9 @@ class PdfService {
             margin: const pw.EdgeInsets.all(30),
             build: (pw.Context context) {
               return _buildSubsequentPage(
-                items: items.sublist(startIndex, endIndex),
-                startItemNumber: startIndex + 1,
-                showTotals: isLastPage,
+                items: pageItems,
+                startItemNumber: pageStartIndex + 1,
+                showTotals: isActuallyLastPage,
                 totalAmount: totalAmount,
                 totalGstAmount: totalGstAmount,
                 grandTotal: grandTotal,
@@ -295,6 +351,8 @@ class PdfService {
             },
           ),
         );
+        
+        currentIndex = pageEndIndex;
       }
     }
     
