@@ -767,11 +767,6 @@ class PdfService {
           'Taxes amounting 18% of the total value will be included in the invoice',
           style: const pw.TextStyle(fontSize: 12),
         ),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          'Lorem Ipsum Doler Sit Amet',
-          style: const pw.TextStyle(fontSize: 12),
-        ),
       ],
     );
   }
