@@ -402,26 +402,25 @@ class _SettingsPageState extends State<SettingsPage> {
                     ],
                   ),
                 ),
-                // Google Drive Sync - Admin Only
-                if (isAdmin) ...[
-                  const SizedBox(height: 16),
-                  Card(
-                    child: ExpansionTile(
-                      leading: Icon(
-                        _isAuthenticated ? Icons.cloud_done : Icons.cloud_off,
+                // Google Drive Sync - Available for all users
+                const SizedBox(height: 16),
+                Card(
+                  child: ExpansionTile(
+                    leading: Icon(
+                      _isAuthenticated ? Icons.cloud_done : Icons.cloud_off,
+                      color: _isAuthenticated ? Colors.green : Colors.grey,
+                    ),
+                    title: const Text('Google Drive Sync'),
+                    subtitle: Text(
+                      _isAuthenticated
+                          ? (_googleAccountEmail ?? 'Connected')
+                          : 'Not connected',
+                      style: TextStyle(
                         color: _isAuthenticated ? Colors.green : Colors.grey,
+                        fontWeight: FontWeight.w500,
                       ),
-                      title: const Text('Google Drive Sync'),
-                      subtitle: Text(
-                        _isAuthenticated
-                            ? (_googleAccountEmail ?? 'Connected')
-                            : 'Not connected',
-                        style: TextStyle(
-                          color: _isAuthenticated ? Colors.green : Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      children: [
+                    ),
+                    children: [
                       Padding(
                         padding: const EdgeInsets.all(16.0),
                         child: Column(
@@ -521,43 +520,45 @@ class _SettingsPageState extends State<SettingsPage> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              const Divider(),
-                              const SizedBox(height: 16),
-                              // Pull Interval Configuration
-                              Row(
-                                children: [
-                                  const Icon(Icons.schedule, size: 20, color: Colors.grey),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Auto Pull Interval',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 16,
+                              // Pull Interval Configuration - Admin Only
+                              if (isAdmin) ...[
+                                const SizedBox(height: 16),
+                                const Divider(),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.schedule, size: 20, color: Colors.grey),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Auto Pull Interval',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: 16,
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '${AutoSyncService.instance.pullInterval.inMinutes} minutes',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 14,
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${AutoSyncService.instance.pullInterval.inMinutes} minutes',
+                                            style: TextStyle(
+                                              color: Colors.grey[600],
+                                              fontSize: 14,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () => _showPullIntervalDialog(),
-                                    tooltip: 'Configure pull interval',
-                                  ),
-                                ],
-                              ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit),
+                                      onPressed: () => _showPullIntervalDialog(),
+                                      tooltip: 'Configure pull interval',
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ],
                         ),
@@ -565,7 +566,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     ],
                   ),
                 ),
-                ],
                 const SizedBox(height: 16),
                 Card(
                   child: ListTile(
