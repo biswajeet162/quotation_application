@@ -23,30 +23,48 @@ class PageHeader extends StatefulWidget {
   State<PageHeader> createState() => _PageHeaderState();
 }
 
-class _PageHeaderState extends State<PageHeader> {
+class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateMixin {
   bool _isPulling = false;
   bool _isPushing = false;
   int _pushCount = 0;
   int _pullCount = 0;
+  AnimationController? _rotationController;
 
   @override
   void initState() {
     super.initState();
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    
     // Listen to auto-sync state changes
     AutoSyncService.instance.onPushStateChanged = () {
-      if (mounted) {
+      if (mounted && _rotationController != null) {
         setState(() {
           _isPushing = AutoSyncService.instance.isPushing;
           _pushCount = AutoSyncService.instance.pushCount;
         });
+        if (_isPushing) {
+          _rotationController!.repeat();
+        } else {
+          _rotationController!.stop();
+          _rotationController!.reset();
+        }
       }
     };
     AutoSyncService.instance.onPullStateChanged = () {
-      if (mounted) {
+      if (mounted && _rotationController != null) {
         setState(() {
           _isPulling = AutoSyncService.instance.isPulling;
           _pullCount = AutoSyncService.instance.pullCount;
         });
+        if (_isPulling) {
+          _rotationController!.repeat();
+        } else {
+          _rotationController!.stop();
+          _rotationController!.reset();
+        }
       }
     };
     // Initialize state
@@ -54,10 +72,15 @@ class _PageHeaderState extends State<PageHeader> {
     _isPulling = AutoSyncService.instance.isPulling;
     _pushCount = AutoSyncService.instance.pushCount;
     _pullCount = AutoSyncService.instance.pullCount;
+    
+    if (_isPushing || _isPulling) {
+      _rotationController!.repeat();
+    }
   }
 
   @override
   void dispose() {
+    _rotationController?.dispose();
     AutoSyncService.instance.onPushStateChanged = null;
     AutoSyncService.instance.onPullStateChanged = null;
     super.dispose();
@@ -151,18 +174,23 @@ class _PageHeaderState extends State<PageHeader> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _isPushing
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
-                                  ),
+                          _rotationController != null
+                              ? AnimatedBuilder(
+                                  animation: _rotationController!,
+                                  builder: (context, child) {
+                                    return Transform.rotate(
+                                      angle: _isPushing ? _rotationController!.value * 2 * 3.14159 : 0,
+                                      child: Icon(
+                                        Icons.sync,
+                                        color: _isPushing ? Colors.red : Colors.grey,
+                                        size: 20,
+                                      ),
+                                    );
+                                  },
                                 )
                               : Icon(
                                   Icons.sync,
-                                  color: Colors.grey,
+                                  color: _isPushing ? Colors.red : Colors.grey,
                                   size: 20,
                                 ),
                           if (_isPushing && _pushCount > 0) ...[
@@ -197,18 +225,23 @@ class _PageHeaderState extends State<PageHeader> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _isPulling
-                                ? SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                                    ),
+                            _rotationController != null
+                                ? AnimatedBuilder(
+                                    animation: _rotationController!,
+                                    builder: (context, child) {
+                                      return Transform.rotate(
+                                        angle: _isPulling ? _rotationController!.value * 2 * 3.14159 : 0,
+                                        child: Icon(
+                                          Icons.sync,
+                                          color: _isPulling ? Colors.green : Colors.grey,
+                                          size: 20,
+                                        ),
+                                      );
+                                    },
                                   )
                                 : Icon(
                                     Icons.sync,
-                                    color: Colors.grey,
+                                    color: _isPulling ? Colors.green : Colors.grey,
                                     size: 20,
                                   ),
                             if (_isPulling && _pullCount > 0) ...[

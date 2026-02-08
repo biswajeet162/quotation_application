@@ -654,6 +654,9 @@ class DriveSyncService {
 
   Future<void> _updateLastSyncTime(DateTime time) async {
     try {
+      // Ensure folder structure is initialized
+      await _driveService.getFolderId('sync');
+      
       final json = jsonEncode({
         'lastSync': time.toIso8601String(),
       });
@@ -672,6 +675,9 @@ class DriveSyncService {
 
   Future<void> _logSync(SyncResult result, DateTime syncTime) async {
     try {
+      // Ensure folder structure is initialized
+      await _driveService.getFolderId('sync');
+      
       final fileId = await _driveService.findFileByName('sync_log.json', 'sync');
       final existingContent = fileId != null
           ? await _driveService.downloadFile(fileId)

@@ -304,7 +304,16 @@ class GoogleDriveService {
 
   Future<String> getFolderId(String folderName) async {
     await _ensureInitialized();
-    return _folderIds[folderName] ?? '';
+    
+    // If folder ID is already cached, return it
+    if (_folderIds.containsKey(folderName) && _folderIds[folderName] != null) {
+      return _folderIds[folderName]!;
+    }
+    
+    // Try to find the folder
+    final folderId = await _findOrCreateFolder(folderName, _rootFolderId!);
+    _folderIds[folderName] = folderId;
+    return folderId;
   }
 
   Future<String> findOrCreateFolder(String folderName, String parentId) async {
