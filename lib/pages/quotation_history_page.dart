@@ -20,6 +20,10 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
   String _categorizationType = 'all'; // 'all', 'company', 'mobile', 'date', 'creator' // 'email' commented out for now
   DateTime? _lastLoadTime;
   bool _isLoadingInProgress = false;
+  
+  // Multiple selection state
+  bool _isSelectionMode = false;
+  Set<int> _selectedQuotationIds = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -178,6 +182,38 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
     return sortedGrouped;
   }
 
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedQuotationIds.clear();
+      }
+    });
+  }
+
+  void _toggleQuotationSelection(int quotationId) {
+    setState(() {
+      if (_selectedQuotationIds.contains(quotationId)) {
+        _selectedQuotationIds.remove(quotationId);
+      } else {
+        _selectedQuotationIds.add(quotationId);
+      }
+    });
+  }
+
+  void _selectAllQuotations() {
+    setState(() {
+      if (_selectedQuotationIds.length == _filteredQuotations.length) {
+        _selectedQuotationIds.clear();
+      } else {
+        _selectedQuotationIds = _filteredQuotations
+            .where((q) => q.id != null)
+            .map((q) => q.id!)
+            .toSet();
+      }
+    });
+  }
+
   Future<void> _deleteQuotation(QuotationHistory quotation) async {
     // Check Google Drive sign-in
     final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
@@ -225,6 +261,91 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error deleting quotation: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _deleteSelectedQuotations() async {
+    if (_selectedQuotationIds.isEmpty) {
+      return;
+    }
+
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
+    final count = _selectedQuotationIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Quotations'),
+        content: Text(
+          'Are you sure you want to delete $count quotation${count > 1 ? 's' : ''}?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        int successCount = 0;
+        int failCount = 0;
+
+        for (final id in _selectedQuotationIds) {
+          try {
+            await DatabaseHelper.instance.deleteQuotationHistory(id);
+            successCount++;
+          } catch (e) {
+            debugPrint('Error deleting quotation $id: $e');
+            failCount++;
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _selectedQuotationIds.clear();
+            _isSelectionMode = false;
+          });
+
+          String message;
+          if (failCount == 0) {
+            message = 'Successfully deleted $successCount quotation${successCount > 1 ? 's' : ''}';
+          } else {
+            message = 'Deleted $successCount quotation${successCount > 1 ? 's' : ''}, $failCount failed';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: failCount == 0 ? Colors.green : Colors.orange,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+          _loadQuotations();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting quotations: $e'),
               backgroundColor: Colors.red,
             ),
           );
@@ -332,11 +453,30 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
   }
 
   Widget _buildQuotationCard(QuotationHistory quotation) {
+    final isSelected = quotation.id != null && _selectedQuotationIds.contains(quotation.id);
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
+      color: isSelected ? Colors.blue[50] : null,
       child: InkWell(
-        onTap: () => _viewQuotationDetails(quotation),
+        onTap: () {
+          if (_isSelectionMode) {
+            if (quotation.id != null) {
+              _toggleQuotationSelection(quotation.id!);
+            }
+          } else {
+            _viewQuotationDetails(quotation);
+          }
+        },
+        onLongPress: () {
+          if (!_isSelectionMode && quotation.id != null) {
+            setState(() {
+              _isSelectionMode = true;
+              _selectedQuotationIds.add(quotation.id!);
+            });
+          }
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -345,6 +485,16 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // Checkbox in selection mode
+                  if (_isSelectionMode) ...[
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: quotation.id != null
+                          ? (value) => _toggleQuotationSelection(quotation.id!)
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -523,11 +673,12 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    tooltip: 'Delete',
-                    onPressed: () => _deleteQuotation(quotation),
-                  ),
+                  if (!_isSelectionMode)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      tooltip: 'Delete',
+                      onPressed: () => _deleteQuotation(quotation),
+                    ),
                 ],
               ),
             ],
@@ -601,6 +752,14 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
                   ),
                 ),
                 const SizedBox(width: 8),
+                // Selection mode toggle button
+                IconButton(
+                  icon: Icon(_isSelectionMode ? Icons.cancel : Icons.check_circle_outline),
+                  tooltip: _isSelectionMode ? 'Cancel Selection' : 'Select Multiple',
+                  color: _isSelectionMode ? Colors.orange : Colors.blue,
+                  onPressed: _toggleSelectionMode,
+                ),
+                const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   tooltip: 'Refresh',
@@ -609,6 +768,54 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
               ],
             ),
           ),
+          // Selection mode toolbar
+          if (_isSelectionMode)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: Colors.blue[100],
+              child: Row(
+                children: [
+                  Text(
+                    '${_selectedQuotationIds.length} selected',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue[900],
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _selectAllQuotations,
+                    icon: Icon(
+                      _selectedQuotationIds.length == _filteredQuotations.length
+                          ? Icons.deselect
+                          : Icons.select_all,
+                      size: 20,
+                    ),
+                    label: Text(
+                      _selectedQuotationIds.length == _filteredQuotations.length
+                          ? 'Deselect All'
+                          : 'Select All',
+                    ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.blue[900],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_selectedQuotationIds.isNotEmpty)
+                    ElevatedButton.icon(
+                      onPressed: _deleteSelectedQuotations,
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      label: const Text('Delete Selected'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           // Quotations List
           Expanded(
             child: _isLoading

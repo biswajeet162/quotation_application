@@ -525,22 +525,20 @@ class DriveSyncService {
             final content = await _driveService.downloadFile(file.id!);
             final data = jsonDecode(content) as Map<String, dynamic>;
 
-            final localQuotation = await db.query(
+            // Check by ID first (primary key) - this is the most reliable check
+            final localQuotationById = await db.query(
               'quotations_history',
-              where: 'quotationNumber = ?',
-              whereArgs: [data['quotationNumber']],
+              where: 'id = ?',
+              whereArgs: [data['id']],
             );
 
-            if (localQuotation.isEmpty) {
-              await _insertQuotationFromDrive(data);
-              result.quotationsDownloaded++;
-            } else {
-              // Use file's modifiedTime from Google Drive for conflict resolution
+            if (localQuotationById.isNotEmpty) {
+              // Quotation exists with this ID - resolve conflict and update
               final fileModifiedTime = file.modifiedTime != null 
                   ? DateTime.parse(file.modifiedTime!.toIso8601String())
                   : null;
               final merged = await _resolveConflict(
-                localQuotation.first, 
+                localQuotationById.first, 
                 data, 
                 'quotations_history',
                 fileModifiedTime: fileModifiedTime,
@@ -549,10 +547,45 @@ class DriveSyncService {
                 await db.update(
                   'quotations_history',
                   merged,
-                  where: 'quotationNumber = ?',
-                  whereArgs: [data['quotationNumber']],
+                  where: 'id = ?',
+                  whereArgs: [data['id']],
                 );
                 result.quotationsMerged++;
+              }
+            } else {
+              // Check by quotationNumber as fallback (in case ID changed but quotationNumber is same)
+              final localQuotationByNumber = await db.query(
+                'quotations_history',
+                where: 'quotationNumber = ?',
+                whereArgs: [data['quotationNumber']],
+              );
+
+              if (localQuotationByNumber.isNotEmpty) {
+                // Quotation exists with same quotationNumber but different ID
+                // This is a conflict - resolve it
+                final fileModifiedTime = file.modifiedTime != null 
+                    ? DateTime.parse(file.modifiedTime!.toIso8601String())
+                    : null;
+                final merged = await _resolveConflict(
+                  localQuotationByNumber.first, 
+                  data, 
+                  'quotations_history',
+                  fileModifiedTime: fileModifiedTime,
+                );
+                if (merged != null) {
+                  // Update the existing record (keeping its original ID)
+                  await db.update(
+                    'quotations_history',
+                    merged,
+                    where: 'quotationNumber = ?',
+                    whereArgs: [data['quotationNumber']],
+                  );
+                  result.quotationsMerged++;
+                }
+              } else {
+                // New quotation - insert it
+                await _insertQuotationFromDrive(data);
+                result.quotationsDownloaded++;
               }
             }
           } catch (e) {
@@ -774,25 +807,58 @@ class DriveSyncService {
     final db = await _db.database;
     final now = DateTime.now().toIso8601String();
     
-    await db.insert('quotations_history', {
-      'id': data['id'],
-      'quotationNumber': data['quotationNumber'],
-      'quotationDate': data['quotationDate'],
-      'customerName': data['customerName'],
-      'customerAddress': data['customerAddress'],
-      'customerContact': data['customerContact'],
-      'customerEmail': data['customerEmail'],
-      'items': data['items'],
-      'totalAmount': data['totalAmount'],
-      'totalGstAmount': data['totalGstAmount'],
-      'grandTotal': data['grandTotal'],
-      'action': data['action'],
-      'createdBy': data['createdBy'],
-      'createdAt': data['createdAt'],
-      'version': data['version'] ?? 1,
-      'sync_status': 'SYNCED',
-      'updatedAt': data['updatedAt'] ?? now,
-    });
+    try {
+      await db.insert('quotations_history', {
+        'id': data['id'],
+        'quotationNumber': data['quotationNumber'],
+        'quotationDate': data['quotationDate'],
+        'customerName': data['customerName'],
+        'customerAddress': data['customerAddress'],
+        'customerContact': data['customerContact'],
+        'customerEmail': data['customerEmail'],
+        'items': data['items'],
+        'totalAmount': data['totalAmount'],
+        'totalGstAmount': data['totalGstAmount'],
+        'grandTotal': data['grandTotal'],
+        'action': data['action'],
+        'createdBy': data['createdBy'],
+        'createdAt': data['createdAt'],
+        'version': data['version'] ?? 1,
+        'sync_status': 'SYNCED',
+        'updatedAt': data['updatedAt'] ?? now,
+      });
+    } catch (e) {
+      // If insert fails due to UNIQUE constraint (id already exists), try to update instead
+      if (e.toString().contains('UNIQUE constraint') || e.toString().contains('1555')) {
+        debugPrint('Quotation with id ${data['id']} already exists, updating instead...');
+        await db.update(
+          'quotations_history',
+          {
+            'quotationNumber': data['quotationNumber'],
+            'quotationDate': data['quotationDate'],
+            'customerName': data['customerName'],
+            'customerAddress': data['customerAddress'],
+            'customerContact': data['customerContact'],
+            'customerEmail': data['customerEmail'],
+            'items': data['items'],
+            'totalAmount': data['totalAmount'],
+            'totalGstAmount': data['totalGstAmount'],
+            'grandTotal': data['grandTotal'],
+            'action': data['action'],
+            'createdBy': data['createdBy'],
+            'createdAt': data['createdAt'],
+            'version': data['version'] ?? 1,
+            'sync_status': 'SYNCED',
+            'updatedAt': data['updatedAt'] ?? now,
+          },
+          where: 'id = ?',
+          whereArgs: [data['id']],
+        );
+      } else {
+        // Re-throw if it's a different error
+        rethrow;
+      }
+    }
   }
 
   Future<void> _insertMyCompanyFromDrive(Map<String, dynamic> data) async {

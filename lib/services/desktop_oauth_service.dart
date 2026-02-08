@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
@@ -218,19 +219,41 @@ class DesktopOAuthService {
       final storedExpiry = await _storage.read(key: _expiryKey);
       _refreshToken = await _storage.read(key: _refreshTokenKey);
 
+      // If no tokens stored at all, user needs to sign in
       if (storedToken == null || storedExpiry == null) {
+        debugPrint('No stored tokens found - user needs to sign in');
         return false;
       }
 
       final expiry = DateTime.parse(storedExpiry);
-      if (expiry.isBefore(DateTime.now())) {
-        return await refreshToken();
+      final now = DateTime.now();
+      final timeSinceExpiry = now.difference(expiry);
+      
+      // If token is expired (even by hours/days), refresh it automatically
+      if (expiry.isBefore(now)) {
+        debugPrint('Access token expired ${timeSinceExpiry.inHours} hours ago, refreshing...');
+        final refreshed = await refreshToken();
+        if (refreshed) {
+          debugPrint('Token refreshed successfully after ${timeSinceExpiry.inHours} hours');
+          return true;
+        } else {
+          debugPrint('Failed to refresh token - refresh token may be expired or invalid');
+          return false;
+        }
       }
 
+      // Token is still valid - only log on first load to avoid spam
+      final wasAlreadyLoaded = _accessToken != null && _tokenExpiry != null;
       _accessToken = storedToken;
       _tokenExpiry = expiry;
+      
+      // Only log when first loading tokens, not on every check
+      if (!wasAlreadyLoaded) {
+        debugPrint('Stored token loaded, expires in ${expiry.difference(now).inMinutes} minutes');
+      }
       return true;
     } catch (e) {
+      debugPrint('Error loading stored tokens: $e');
       return false;
     }
   }
@@ -240,6 +263,7 @@ class DesktopOAuthService {
       if (_refreshToken == null) {
         final stored = await _storage.read(key: _refreshTokenKey);
         if (stored == null) {
+          debugPrint('Refresh token not found - user needs to re-authenticate');
           return false;
         }
         _refreshToken = stored;
@@ -253,14 +277,30 @@ class DesktopOAuthService {
           'refresh_token': _refreshToken,
           'grant_type': 'refresh_token',
         },
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (tokenResponse.statusCode != 200) {
+        final errorBody = tokenResponse.body;
+        debugPrint('Token refresh failed: ${tokenResponse.statusCode} - $errorBody');
+        
+        // If refresh token is invalid/expired, clear stored tokens
+        if (tokenResponse.statusCode == 400 || tokenResponse.statusCode == 401) {
+          debugPrint('Refresh token expired or invalid - clearing stored tokens');
+          await signOut();
+        }
         return false;
       }
 
       final tokenData = jsonDecode(tokenResponse.body) as Map<String, dynamic>;
       _accessToken = tokenData['access_token'] as String;
+      
+      // Update refresh token if provided (Google may issue a new one)
+      if (tokenData.containsKey('refresh_token')) {
+        _refreshToken = tokenData['refresh_token'] as String?;
+        if (_refreshToken != null) {
+          await _storage.write(key: _refreshTokenKey, value: _refreshToken);
+        }
+      }
       
       final expiresIn = tokenData['expires_in'] as int;
       _tokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
@@ -271,8 +311,16 @@ class DesktopOAuthService {
         value: _tokenExpiry!.toIso8601String(),
       );
 
+      debugPrint('Token refreshed successfully, expires in ${expiresIn}s');
       return true;
     } catch (e) {
+      debugPrint('Token refresh error: $e');
+      // If it's a timeout or network error, don't clear tokens
+      // Only clear if it's an authentication error
+      if (e.toString().contains('400') || e.toString().contains('401')) {
+        debugPrint('Authentication error during refresh - clearing tokens');
+        await signOut();
+      }
       return false;
     }
   }
@@ -281,14 +329,31 @@ class DesktopOAuthService {
     if (_accessToken == null || _tokenExpiry == null) {
       final loaded = await loadStoredTokens();
       if (!loaded) {
+        debugPrint('Failed to load stored tokens');
         return null;
       }
     }
 
-    if (_tokenExpiry != null && _tokenExpiry!.isBefore(DateTime.now())) {
-      final refreshed = await refreshToken();
-      if (!refreshed) {
-        return null;
+    // Check if token is expired or about to expire (within 10 minutes)
+    // Google tokens typically expire after 1 hour (3600 seconds)
+    // Refreshing 10 minutes early (600 seconds) gives us a safe buffer
+    if (_tokenExpiry != null) {
+      final now = DateTime.now();
+      final timeUntilExpiry = _tokenExpiry!.difference(now);
+      
+      // Refresh if expired or expiring within 10 minutes (600 seconds)
+      // This is approximately 1/6 of the token lifetime, providing a safe buffer
+      if (timeUntilExpiry.isNegative || timeUntilExpiry.inSeconds < 600) {
+        // Only log if token is actually expired or very close (within 1 minute)
+        // This prevents log spam when checking on every HTTP request
+        if (timeUntilExpiry.isNegative || timeUntilExpiry.inSeconds < 60) {
+          debugPrint('Token expired or expiring soon (${timeUntilExpiry.inMinutes} min remaining), refreshing...');
+        }
+        final refreshed = await refreshToken();
+        if (!refreshed) {
+          debugPrint('Token refresh failed - user needs to re-authenticate');
+          return null;
+        }
       }
     }
 

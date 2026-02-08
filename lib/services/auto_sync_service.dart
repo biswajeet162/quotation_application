@@ -72,6 +72,10 @@ class AutoSyncService {
     }
   }
 
+  // Queue for pending pushes when one is already in progress
+  bool _hasPendingPush = false;
+  Completer<bool>? _pendingPushCompleter;
+
   /// Perform automatic push for a single record
   /// IMMEDIATELY pushes pending records to Drive (NO PULL)
   /// Returns true if push was successful or skipped, false on error
@@ -88,22 +92,40 @@ class AutoSyncService {
       return false;
     }
 
-    // Don't block if already pushing - queue it or skip
+    // If already pushing, mark that we have pending changes and wait for current push to finish
     if (_isPushing) {
-      // Wait a bit and try again
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (_isPushing) {
-        // Still pushing, skip this one (will be picked up in next push)
-        return true;
+      _hasPendingPush = true;
+      // Wait for current push to complete, then trigger another push immediately
+      if (_pendingPushCompleter != null) {
+        // Already waiting, just mark pending
+        return await _pendingPushCompleter!.future;
       }
+      _pendingPushCompleter = Completer<bool>();
+      // Wait for current push to finish
+      while (_isPushing) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      // Current push finished, now push immediately
+      _hasPendingPush = false;
+      final completer = _pendingPushCompleter;
+      _pendingPushCompleter = null;
+      final result = await _performPush();
+      completer?.complete(result);
+      return result;
     }
 
+    // No push in progress, push immediately
+    return await _performPush();
+  }
+
+  /// Internal method to perform the actual push
+  Future<bool> _performPush() async {
     _isPushing = true;
     _pushCount = 0;
     onPushStateChanged?.call();
 
     try {
-      // PUSH ONLY - no pull
+      // PUSH ONLY - no pull - push immediately
       final result = await DriveSyncService.instance.pushOnly(forceFullSync: false);
       _pushCount = result.usersSynced + result.companiesSynced + result.quotationsSynced + result.myCompanySynced;
       
@@ -136,6 +158,18 @@ class AutoSyncService {
     } finally {
       _isPushing = false;
       onPushStateChanged?.call();
+      
+      // If there are pending changes, push again immediately
+      if (_hasPendingPush) {
+        _hasPendingPush = false;
+        // Push again immediately after a tiny delay to ensure state is clean
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (!_isPushing) {
+            _performPush();
+          }
+        });
+      }
+      
       // Reset count after a short delay to let user see it
       Future.delayed(const Duration(seconds: 3), () {
         if (!_isPushing) {

@@ -221,10 +221,19 @@ class GoogleAuthService {
       }
     }
 
-    if (_tokenExpiry != null && _tokenExpiry!.isBefore(DateTime.now())) {
-      final refreshed = await refreshToken();
-      if (!refreshed) {
-        return null;
+    // Check if token is expired or about to expire (within 10 minutes)
+    // Google tokens typically expire after 1 hour (3600 seconds)
+    // Refreshing 10 minutes early (600 seconds) gives us a safe buffer
+    if (_tokenExpiry != null) {
+      final now = DateTime.now();
+      final timeUntilExpiry = _tokenExpiry!.difference(now);
+      
+      // Refresh if expired or expiring within 10 minutes (600 seconds)
+      if (timeUntilExpiry.isNegative || timeUntilExpiry.inSeconds < 600) {
+        final refreshed = await refreshToken();
+        if (!refreshed) {
+          return null;
+        }
       }
     }
 
