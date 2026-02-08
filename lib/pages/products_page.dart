@@ -8,7 +8,6 @@ import '../utils/product_sort_util.dart';
 import '../widgets/page_header.dart';
 import '../widgets/search_bar.dart' show AppSearchBar;
 import '../widgets/products_table.dart';
-import '../utils/google_drive_auth_helper.dart';
 
 class ProductsPage extends StatefulWidget {
   const ProductsPage({super.key});
@@ -99,12 +98,6 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _clearDatabase() async {
-    // Check Google Drive sign-in
-    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
-    if (!isSignedIn) {
-      return;
-    }
-
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
@@ -165,12 +158,6 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _importExcel() async {
-    // Check Google Drive sign-in
-    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
-    if (!isSignedIn) {
-      return;
-    }
-
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,

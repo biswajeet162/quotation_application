@@ -57,7 +57,7 @@ class GoogleDriveAuthHelper {
   }
 
   /// Handles Google Drive sign-in
-  static Future<void> _handleSignIn(BuildContext context) async {
+  static Future<bool> _handleSignIn(BuildContext context) async {
     try {
       final googleAuth = GoogleAuthService.instance;
       final success = await googleAuth.signIn();
@@ -71,6 +71,7 @@ class GoogleDriveAuthHelper {
               duration: Duration(seconds: 2),
             ),
           );
+          return true;
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -79,8 +80,10 @@ class GoogleDriveAuthHelper {
               duration: Duration(seconds: 3),
             ),
           );
+          return false;
         }
       }
+      return false;
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -91,7 +94,13 @@ class GoogleDriveAuthHelper {
           ),
         );
       }
+      return false;
     }
+  }
+
+  /// Directly signs in to Google Drive (without showing notification first)
+  static Future<bool> signInDirectly(BuildContext context) async {
+    return await _handleSignIn(context);
   }
 }
 

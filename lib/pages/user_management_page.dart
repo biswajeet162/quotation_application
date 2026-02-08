@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../widgets/page_header.dart';
 import '../utils/google_drive_auth_helper.dart';
+import '../services/google_auth_service.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -16,11 +17,35 @@ class UserManagementPage extends StatefulWidget {
 class _UserManagementPageState extends State<UserManagementPage> {
   List<User> _users = [];
   bool _isLoading = true;
+  bool _isGoogleDriveSignedIn = false;
+  String? _googleDriveAccountEmail;
 
   @override
   void initState() {
     super.initState();
     _loadUsers();
+    _checkGoogleDriveStatus();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh Google Drive status when page becomes visible
+    _checkGoogleDriveStatus();
+  }
+
+  Future<void> _checkGoogleDriveStatus() async {
+    final googleAuth = GoogleAuthService.instance;
+    await googleAuth.loadStoredTokens();
+    final isSignedIn = googleAuth.isSignedIn;
+    final account = googleAuth.currentUser;
+    
+    if (mounted) {
+      setState(() {
+        _isGoogleDriveSignedIn = isSignedIn;
+        _googleDriveAccountEmail = account?.email ?? (isSignedIn ? 'Authenticated' : null);
+      });
+    }
   }
 
   Future<void> _loadUsers() async {
@@ -607,6 +632,52 @@ class _UserManagementPageState extends State<UserManagementPage> {
                                   )
                                 else
                                   _buildInfoRow('Last Login', 'Never', Icons.access_time),
+                                const Divider(height: 24),
+                                // Google Drive Status Section
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _isGoogleDriveSignedIn ? Icons.cloud_done : Icons.cloud_off,
+                                      size: 16,
+                                      color: _isGoogleDriveSignedIn ? Colors.green : Colors.orange[700],
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Google Drive: ',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        _isGoogleDriveSignedIn
+                                            ? (_googleDriveAccountEmail ?? 'Signed In')
+                                            : 'Not Signed In',
+                                        style: TextStyle(
+                                          color: _isGoogleDriveSignedIn ? Colors.green[700] : Colors.orange[700],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    if (!_isGoogleDriveSignedIn)
+                                      TextButton.icon(
+                                        onPressed: () async {
+                                          final success = await GoogleDriveAuthHelper.signInDirectly(context);
+                                          if (success) {
+                                            await _checkGoogleDriveStatus();
+                                          }
+                                        },
+                                        icon: const Icon(Icons.login, size: 16),
+                                        label: const Text('Sign In'),
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),

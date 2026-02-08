@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/drive_sync_service.dart';
 import '../services/auto_sync_service.dart';
+import '../services/desktop_oauth_service.dart';
 
 class PageHeader extends StatefulWidget {
   final String title;
@@ -29,6 +31,7 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
   int _pushCount = 0;
   int _pullCount = 0;
   AnimationController? _rotationController;
+  bool _isGoogleDriveSignedIn = false;
 
   @override
   void initState() {
@@ -37,6 +40,11 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(seconds: 2),
     );
+    
+    // Check Google Drive status
+    _checkGoogleDriveStatus();
+    // Start periodic check to update status
+    _startPeriodicCheck();
     
     // Listen to auto-sync state changes
     AutoSyncService.instance.onPushStateChanged = () {
@@ -86,6 +94,55 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
     super.dispose();
   }
 
+  Future<void> _checkGoogleDriveStatus() async {
+    try {
+      final googleAuth = GoogleAuthService.instance;
+      // Load stored tokens first to ensure status is up to date
+      await googleAuth.loadStoredTokens();
+      
+      // For desktop platforms, check DesktopOAuthService directly
+      // For mobile, check GoogleAuthService
+      bool isSignedIn;
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        // Check DesktopOAuthService directly after loading tokens
+        isSignedIn = DesktopOAuthService.instance.isSignedIn;
+      } else {
+        // For mobile, use GoogleAuthService
+        isSignedIn = googleAuth.isSignedIn;
+      }
+      
+      if (mounted) {
+        setState(() {
+          _isGoogleDriveSignedIn = isSignedIn;
+        });
+      }
+    } catch (e) {
+      // If there's an error, assume not signed in
+      if (mounted) {
+        setState(() {
+          _isGoogleDriveSignedIn = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh Google Drive status when page becomes visible
+    _checkGoogleDriveStatus();
+  }
+
+  // Periodic check to update Google Drive status
+  void _startPeriodicCheck() {
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        _checkGoogleDriveStatus();
+        _startPeriodicCheck(); // Schedule next check
+      }
+    });
+  }
+
   Future<void> _syncNow() async {
     final isAuthenticated = GoogleAuthService.instance.isSignedIn;
     if (!isAuthenticated) {
@@ -124,7 +181,6 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
     final userName = currentUser?.name.isNotEmpty == true
         ? currentUser!.name
         : (currentUser?.email ?? 'User');
-    final isGoogleAuthenticated = GoogleAuthService.instance.isSignedIn;
 
     return Column(
       children: [
@@ -159,6 +215,21 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                         color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Google Drive Status Dot
+                    Tooltip(
+                      message: _isGoogleDriveSignedIn 
+                          ? 'Google Drive: Signed In' 
+                          : 'Google Drive: Not Signed In',
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _isGoogleDriveSignedIn ? Colors.green : Colors.red,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
                   ],
