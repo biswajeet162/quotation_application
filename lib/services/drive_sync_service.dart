@@ -469,7 +469,10 @@ class DriveSyncService {
       for (final yearFolder in yearFolders.files ?? []) {
         String fileQuery = "'${yearFolder.id}' in parents and trashed=false";
         if (!forceFullSync && lastSync != null) {
-          final timeStr = lastSync.toUtc().toIso8601String();
+          // Subtract 2 hours buffer to account for clock differences and ensure we don't miss files
+          // that were uploaded just before the last sync time
+          final bufferTime = lastSync.subtract(const Duration(hours: 2));
+          final timeStr = bufferTime.toUtc().toIso8601String();
           fileQuery += " and modifiedTime > '$timeStr'";
         }
 
@@ -585,47 +588,109 @@ class DriveSyncService {
     final localUpdatedAt = local['updatedAt'] as String? ?? local['createdAt'] as String? ?? '';
     final remoteUpdatedAt = remote['updatedAt'] as String? ?? remote['createdAt'] as String? ?? '';
 
-    // If fileModifiedTime is provided (from Google Drive), it means the file was modified on Drive
-    // Since we're pulling and the file appeared in the filtered list, we should accept it
+    // First, check if data is actually different to avoid unnecessary updates
+    if (_isDataIdentical(local, remote, tableName)) {
+      // Data is identical, no need to update
+      return null;
+    }
+
+    // If fileModifiedTime is provided (from Google Drive), use it for conflict resolution
     if (fileModifiedTime != null) {
       final localTime = DateTime.tryParse(localUpdatedAt) ?? DateTime(1970);
       
-      // If the file on Drive was modified after the local record, always accept the remote data
+      // Priority 1: If the file on Drive was modified after the local record, accept remote
       if (fileModifiedTime.isAfter(localTime)) {
         return remote;
       }
       
-      // If file modified time equals or is before local time, but remote version is higher, accept remote
-      if (remoteVersion > localVersion) {
-        return remote;
+      // Priority 2: If file modified time equals local time, compare versions
+      if (fileModifiedTime.isAtSameMomentAs(localTime) || 
+          (fileModifiedTime.isBefore(localTime) && fileModifiedTime.difference(localTime).abs().inSeconds < 2)) {
+        // Timestamps are very close (within 2 seconds), use version comparison
+        if (remoteVersion > localVersion) {
+          return remote;
+        } else if (localVersion > remoteVersion) {
+          return null; // Keep local - local version is higher
+        } else {
+          // Versions are equal and timestamps are close - compare remote updatedAt
+          final remoteTime = DateTime.tryParse(remoteUpdatedAt) ?? DateTime(1970);
+          if (remoteTime.isAfter(localTime)) {
+            return remote;
+          } else {
+            return null; // Keep local - local is newer or equal
+          }
+        }
       }
       
-      // If local version is strictly higher, keep local (local changes take precedence)
-      if (localVersion > remoteVersion) {
+      // Priority 3: File modified time is before local time
+      // Check version to determine which is newer
+      if (remoteVersion > localVersion) {
+        return remote; // Remote version is higher despite older file time
+      } else if (localVersion > remoteVersion) {
+        return null; // Keep local - local version is higher
+      } else {
+        // Versions are equal, file time is older - keep local
         return null;
       }
-      
-      // If versions are equal and file time equals local time, accept remote to ensure sync
-      // This handles cases where timestamps might be slightly off but data was updated
-      if (remoteVersion == localVersion) {
-        // Accept remote if file was modified (even if timestamp comparison is equal)
-        // This ensures that if the file appears in the pull list, we update the database
-        return remote;
-      }
-      
-      return null;
     }
 
-    // Fallback to original logic if fileModifiedTime is not available
+    // Fallback logic when fileModifiedTime is not available
+    // Priority 1: Compare versions
     if (remoteVersion > localVersion) {
       return remote;
-    } else if (remoteVersion < localVersion) {
-      return null;
+    } else if (localVersion > remoteVersion) {
+      return null; // Keep local - local version is higher
     } else {
+      // Versions are equal - compare timestamps
       final localTime = DateTime.tryParse(localUpdatedAt) ?? DateTime(1970);
       final remoteTime = DateTime.tryParse(remoteUpdatedAt) ?? DateTime(1970);
-      // Accept remote if it's newer or equal (to ensure updates are applied)
-      return remoteTime.isAfter(localTime) || remoteTime.isAtSameMomentAs(localTime) ? remote : null;
+      
+      if (remoteTime.isAfter(localTime)) {
+        return remote; // Remote timestamp is newer
+      } else if (localTime.isAfter(remoteTime)) {
+        return null; // Keep local - local timestamp is newer
+      } else {
+        // Timestamps are equal - no update needed (data should be identical)
+        return null;
+      }
+    }
+  }
+
+  /// Check if local and remote data are identical (excluding sync metadata)
+  bool _isDataIdentical(
+    Map<String, dynamic> local,
+    Map<String, dynamic> remote,
+    String tableName,
+  ) {
+    // Fields to exclude from comparison (sync metadata)
+    final excludeFields = {'version', 'sync_status', 'updatedAt', 'createdAt'};
+    
+    // Create copies without sync metadata
+    final localData = Map<String, dynamic>.from(local);
+    final remoteData = Map<String, dynamic>.from(remote);
+    
+    excludeFields.forEach((field) {
+      localData.remove(field);
+      remoteData.remove(field);
+    });
+    
+    // Compare JSON strings for deep equality
+    try {
+      final localJson = jsonEncode(localData);
+      final remoteJson = jsonEncode(remoteData);
+      return localJson == remoteJson;
+    } catch (e) {
+      // If JSON encoding fails, do field-by-field comparison
+      if (localData.length != remoteData.length) {
+        return false;
+      }
+      
+      for (final key in localData.keys) {
+        if (localData[key] != remoteData[key]) {
+          return false;
+        }
+      }
+      return true;
     }
   }
 

@@ -249,7 +249,10 @@ class GoogleDriveService {
 
     String query = "'$folderId' in parents and trashed=false";
     if (modifiedAfter != null) {
-      final timeStr = modifiedAfter.toUtc().toIso8601String();
+      // Subtract 2 hours buffer to account for clock differences and ensure we don't miss files
+      // that were uploaded just before the last sync time
+      final bufferTime = modifiedAfter.subtract(const Duration(hours: 2));
+      final timeStr = bufferTime.toUtc().toIso8601String();
       query += " and modifiedTime > '$timeStr'";
     }
 
@@ -278,7 +281,10 @@ class GoogleDriveService {
 
     String query = "'$subfolderId' in parents and trashed=false";
     if (modifiedAfter != null) {
-      final timeStr = modifiedAfter.toUtc().toIso8601String();
+      // Subtract 2 hours buffer to account for clock differences and ensure we don't miss files
+      // that were uploaded just before the last sync time
+      final bufferTime = modifiedAfter.subtract(const Duration(hours: 2));
+      final timeStr = bufferTime.toUtc().toIso8601String();
       query += " and modifiedTime > '$timeStr'";
     }
 
