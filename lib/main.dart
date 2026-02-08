@@ -79,9 +79,10 @@ class _MainScreenState extends State<MainScreen> {
     // Wait a bit for the app to fully initialize
     await Future.delayed(const Duration(seconds: 2));
     
-    // Check if Google Drive is authenticated
-    if (GoogleAuthService.instance.isSignedIn) {
-      // Start automatic pull timer
+    // Load stored tokens and check if Google Drive is authenticated
+    final isAuthenticated = await GoogleAuthService.instance.loadStoredTokens();
+    if (isAuthenticated) {
+      // Start automatic pull timer (runs every 5 minutes)
       AutoSyncService.instance.startAutoPull();
       
       // Perform initial pull on app startup

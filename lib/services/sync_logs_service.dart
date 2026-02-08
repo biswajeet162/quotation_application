@@ -62,6 +62,9 @@ class SyncLogsService {
   SyncLogsService._init();
 
   static Database? _database;
+  
+  // Callback to notify when a new log is added
+  VoidCallback? onLogAdded;
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -110,7 +113,10 @@ class SyncLogsService {
 
   Future<int> addLog(SyncLog log) async {
     final db = await database;
-    return await db.insert('sync_logs', log.toMap());
+    final id = await db.insert('sync_logs', log.toMap());
+    // Notify listeners that a new log was added
+    onLogAdded?.call();
+    return id;
   }
 
   Future<List<SyncLog>> getLogs({

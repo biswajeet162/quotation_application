@@ -19,6 +19,57 @@ class DriveSyncService {
   final DatabaseHelper _db = DatabaseHelper.instance;
   final GoogleDriveService _driveService = GoogleDriveService.instance;
 
+  /// Push only - uploads pending local changes to Drive
+  Future<SyncResult> pushOnly({bool forceFullSync = false}) async {
+    final result = SyncResult();
+
+    try {
+      if (!await GoogleAuthService.instance.loadStoredTokens()) {
+        result.errors.add('Not authenticated with Google');
+        return result;
+      }
+
+      result.usersSynced = await _syncUsers(null, forceFullSync);
+      result.companiesSynced = await _syncCompanies(null, forceFullSync);
+      result.quotationsSynced = await _syncQuotations(null, forceFullSync);
+      result.myCompanySynced = await _syncMyCompany(null, forceFullSync);
+
+      result.success = true;
+    } catch (e) {
+      result.errors.add('Push failed: $e');
+    }
+
+    return result;
+  }
+
+  /// Pull only - downloads changes from Drive to local DB
+  Future<SyncResult> pullOnly({bool forceFullSync = false}) async {
+    final result = SyncResult();
+
+    try {
+      if (!await GoogleAuthService.instance.loadStoredTokens()) {
+        result.errors.add('Not authenticated with Google');
+        return result;
+      }
+
+      final lastSync = await _getLastSyncTime();
+      final syncStartTime = DateTime.now();
+
+      await _downloadAndMergeRemoteChanges(lastSync, forceFullSync, result);
+
+      await _updateLastSyncTime(syncStartTime);
+      await _logSync(result, syncStartTime);
+
+      result.success = true;
+    } catch (e) {
+      result.errors.add('Pull failed: $e');
+      await _logSync(result, DateTime.now());
+    }
+
+    return result;
+  }
+
+  /// Full sync - both push and pull
   Future<SyncResult> syncAll({bool forceFullSync = false}) async {
     final result = SyncResult();
 
@@ -31,11 +82,13 @@ class DriveSyncService {
       final lastSync = await _getLastSyncTime();
       final syncStartTime = DateTime.now();
 
+      // First push local changes
       result.usersSynced = await _syncUsers(lastSync, forceFullSync);
       result.companiesSynced = await _syncCompanies(lastSync, forceFullSync);
       result.quotationsSynced = await _syncQuotations(lastSync, forceFullSync);
       result.myCompanySynced = await _syncMyCompany(lastSync, forceFullSync);
 
+      // Then pull remote changes
       await _downloadAndMergeRemoteChanges(lastSync, forceFullSync, result);
 
       await _updateLastSyncTime(syncStartTime);
@@ -81,7 +134,7 @@ class DriveSyncService {
           'users',
           {
             'sync_status': 'SYNCED',
-            'updatedAt': DateTime.now().toIso8601String(),
+            // Don't update updatedAt - preserve original timestamp
           },
           where: 'id = ?',
           whereArgs: [user.id],
@@ -127,7 +180,7 @@ class DriveSyncService {
           'companies',
           {
             'sync_status': 'SYNCED',
-            'updatedAt': DateTime.now().toIso8601String(),
+            // Don't update updatedAt - preserve original timestamp
           },
           where: 'id = ?',
           whereArgs: [company.id],
@@ -170,7 +223,7 @@ class DriveSyncService {
           'quotations_history',
           {
             'sync_status': 'SYNCED',
-            'updatedAt': DateTime.now().toIso8601String(),
+            // Don't update updatedAt - preserve original timestamp
           },
           where: 'id = ?',
           whereArgs: [quotation.id],
@@ -191,11 +244,12 @@ class DriveSyncService {
     String folderId,
   ) async {
     final query = "name='$fileName' and '$folderId' in parents and trashed=false";
-    final token = await GoogleAuthService.instance.getValidAccessToken();
-    if (token == null) throw Exception('Not authenticated');
+    if (!await GoogleAuthService.instance.loadStoredTokens()) {
+      throw Exception('Not authenticated');
+    }
 
     final baseClient = http.Client();
-    final authClient = AuthenticatedHttpClient(baseClient, token);
+    final authClient = AuthenticatedHttpClient(baseClient);
 
     final driveApi = drive.DriveApi(authClient);
     final response = await driveApi.files.list(
@@ -260,7 +314,7 @@ class DriveSyncService {
         'my_company',
         {
           'sync_status': 'SYNCED',
-          'updatedAt': DateTime.now().toIso8601String(),
+          // Don't update updatedAt - preserve original timestamp
         },
         where: 'id = ?',
         whereArgs: [1],
@@ -312,7 +366,16 @@ class DriveSyncService {
             await _insertUserFromDrive(data);
             result.usersDownloaded++;
           } else {
-            final merged = await _resolveConflict(localUser.first, data, 'users');
+            // Use file's modifiedTime from Google Drive for conflict resolution
+            final fileModifiedTime = file.modifiedTime != null 
+                ? DateTime.parse(file.modifiedTime!.toIso8601String())
+                : null;
+            final merged = await _resolveConflict(
+              localUser.first, 
+              data, 
+              'users',
+              fileModifiedTime: fileModifiedTime,
+            );
             if (merged != null) {
               await db.update('users', merged, where: 'id = ?', whereArgs: [data['id']]);
               result.usersMerged++;
@@ -355,7 +418,16 @@ class DriveSyncService {
             await _insertCompanyFromDrive(data);
             result.companiesDownloaded++;
           } else {
-            final merged = await _resolveConflict(localCompany.first, data, 'companies');
+            // Use file's modifiedTime from Google Drive for conflict resolution
+            final fileModifiedTime = file.modifiedTime != null 
+                ? DateTime.parse(file.modifiedTime!.toIso8601String())
+                : null;
+            final merged = await _resolveConflict(
+              localCompany.first, 
+              data, 
+              'companies',
+              fileModifiedTime: fileModifiedTime,
+            );
             if (merged != null) {
               await db.update('companies', merged, where: 'id = ?', whereArgs: [data['id']]);
               result.companiesMerged++;
@@ -377,11 +449,12 @@ class DriveSyncService {
   ) async {
     try {
       final quotationsFolderId = await _driveService.getFolderId('quotations');
-      final token = await GoogleAuthService.instance.getValidAccessToken();
-      if (token == null) return;
+      if (!await GoogleAuthService.instance.loadStoredTokens()) {
+        return;
+      }
 
       final baseClient = http.Client();
-      final authClient = AuthenticatedHttpClient(baseClient, token);
+      final authClient = AuthenticatedHttpClient(baseClient);
 
       final driveApi = drive.DriveApi(authClient);
 
@@ -420,7 +493,16 @@ class DriveSyncService {
               await _insertQuotationFromDrive(data);
               result.quotationsDownloaded++;
             } else {
-              final merged = await _resolveConflict(localQuotation.first, data, 'quotations_history');
+              // Use file's modifiedTime from Google Drive for conflict resolution
+              final fileModifiedTime = file.modifiedTime != null 
+                  ? DateTime.parse(file.modifiedTime!.toIso8601String())
+                  : null;
+              final merged = await _resolveConflict(
+                localQuotation.first, 
+                data, 
+                'quotations_history',
+                fileModifiedTime: fileModifiedTime,
+              );
               if (merged != null) {
                 await db.update(
                   'quotations_history',
@@ -452,6 +534,16 @@ class DriveSyncService {
         return;
       }
 
+      // Get file metadata to check modifiedTime
+      if (!await GoogleAuthService.instance.loadStoredTokens()) {
+        return;
+      }
+
+      final baseClient = http.Client();
+      final authClient = AuthenticatedHttpClient(baseClient);
+      final driveApi = drive.DriveApi(authClient);
+      final fileMetadata = await driveApi.files.get(fileId) as drive.File;
+
       final content = await _driveService.downloadFile(fileId);
       final data = jsonDecode(content) as Map<String, dynamic>;
 
@@ -462,7 +554,16 @@ class DriveSyncService {
         await _insertMyCompanyFromDrive(data);
         result.myCompanyDownloaded = true;
       } else {
-        final merged = await _resolveConflict(local, data, 'my_company');
+        // Use file's modifiedTime from Google Drive for conflict resolution
+        final fileModifiedTime = fileMetadata.modifiedTime != null 
+            ? DateTime.parse(fileMetadata.modifiedTime!.toIso8601String())
+            : null;
+        final merged = await _resolveConflict(
+          local, 
+          data, 
+          'my_company',
+          fileModifiedTime: fileModifiedTime,
+        );
         if (merged != null) {
           await db.update('my_company', merged, where: 'id = ?', whereArgs: [1]);
           result.myCompanyMerged = true;
@@ -476,13 +577,46 @@ class DriveSyncService {
   Future<Map<String, dynamic>?> _resolveConflict(
     Map<String, dynamic> local,
     Map<String, dynamic> remote,
-    String tableName,
-  ) async {
+    String tableName, {
+    DateTime? fileModifiedTime,
+  }) async {
     final localVersion = local['version'] as int? ?? 1;
     final remoteVersion = remote['version'] as int? ?? 1;
     final localUpdatedAt = local['updatedAt'] as String? ?? local['createdAt'] as String? ?? '';
     final remoteUpdatedAt = remote['updatedAt'] as String? ?? remote['createdAt'] as String? ?? '';
 
+    // If fileModifiedTime is provided (from Google Drive), it means the file was modified on Drive
+    // Since we're pulling and the file appeared in the filtered list, we should accept it
+    if (fileModifiedTime != null) {
+      final localTime = DateTime.tryParse(localUpdatedAt) ?? DateTime(1970);
+      
+      // If the file on Drive was modified after the local record, always accept the remote data
+      if (fileModifiedTime.isAfter(localTime)) {
+        return remote;
+      }
+      
+      // If file modified time equals or is before local time, but remote version is higher, accept remote
+      if (remoteVersion > localVersion) {
+        return remote;
+      }
+      
+      // If local version is strictly higher, keep local (local changes take precedence)
+      if (localVersion > remoteVersion) {
+        return null;
+      }
+      
+      // If versions are equal and file time equals local time, accept remote to ensure sync
+      // This handles cases where timestamps might be slightly off but data was updated
+      if (remoteVersion == localVersion) {
+        // Accept remote if file was modified (even if timestamp comparison is equal)
+        // This ensures that if the file appears in the pull list, we update the database
+        return remote;
+      }
+      
+      return null;
+    }
+
+    // Fallback to original logic if fileModifiedTime is not available
     if (remoteVersion > localVersion) {
       return remote;
     } else if (remoteVersion < localVersion) {
@@ -490,7 +624,8 @@ class DriveSyncService {
     } else {
       final localTime = DateTime.tryParse(localUpdatedAt) ?? DateTime(1970);
       final remoteTime = DateTime.tryParse(remoteUpdatedAt) ?? DateTime(1970);
-      return remoteTime.isAfter(localTime) ? remote : null;
+      // Accept remote if it's newer or equal (to ensure updates are applied)
+      return remoteTime.isAfter(localTime) || remoteTime.isAtSameMomentAs(localTime) ? remote : null;
     }
   }
 

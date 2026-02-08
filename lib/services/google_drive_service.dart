@@ -26,13 +26,12 @@ class GoogleDriveService {
       return;
     }
 
-    final token = await GoogleAuthService.instance.getValidAccessToken();
-    if (token == null) {
+    if (!await GoogleAuthService.instance.loadStoredTokens()) {
       throw Exception('Not authenticated with Google');
     }
 
     final baseClient = http.Client();
-    final authClient = AuthenticatedHttpClient(baseClient, token);
+    final authClient = AuthenticatedHttpClient(baseClient);
 
     _driveApi = drive.DriveApi(authClient);
     _rootFolderId = await _findOrCreateRootFolder();

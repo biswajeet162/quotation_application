@@ -73,6 +73,7 @@ class AutoSyncService {
   }
 
   /// Perform automatic push for a single record
+  /// IMMEDIATELY pushes pending records to Drive (NO PULL)
   /// Returns true if push was successful or skipped, false on error
   Future<bool> pushSingleRecord({
     required String table,
@@ -83,13 +84,18 @@ class AutoSyncService {
       return true;
     }
 
-    if (_isPushing) {
-      // Skip if already pushing to avoid conflicts
-      return true;
-    }
-
     if (!GoogleAuthService.instance.isSignedIn) {
       return false;
+    }
+
+    // Don't block if already pushing - queue it or skip
+    if (_isPushing) {
+      // Wait a bit and try again
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (_isPushing) {
+        // Still pushing, skip this one (will be picked up in next push)
+        return true;
+      }
     }
 
     _isPushing = true;
@@ -97,7 +103,8 @@ class AutoSyncService {
     onPushStateChanged?.call();
 
     try {
-      final result = await DriveSyncService.instance.syncAll(forceFullSync: false);
+      // PUSH ONLY - no pull
+      final result = await DriveSyncService.instance.pushOnly(forceFullSync: false);
       _pushCount = result.usersSynced + result.companiesSynced + result.quotationsSynced + result.myCompanySynced;
       
       // Log the push operation
@@ -140,6 +147,7 @@ class AutoSyncService {
   }
 
   /// Perform automatic pull
+  /// PULLS ONLY from Drive to local DB (NO PUSH)
   Future<void> _performPull() async {
     if (_isPulling) {
       return; // Skip if already pulling
@@ -154,7 +162,8 @@ class AutoSyncService {
     onPullStateChanged?.call();
 
     try {
-      final result = await DriveSyncService.instance.syncAll(forceFullSync: false);
+      // PULL ONLY - no push
+      final result = await DriveSyncService.instance.pullOnly(forceFullSync: false);
       _pullCount = result.usersDownloaded + result.companiesDownloaded + result.quotationsDownloaded;
       
       // Log the pull operation
@@ -194,7 +203,18 @@ class AutoSyncService {
   }
 
   /// Perform manual pull (called on app startup or manual sync)
+  /// This ensures logs are created even for manual pulls
   Future<void> performPull() async {
+    // If already pulling, wait for it to finish
+    if (_isPulling) {
+      // Wait for current pull to finish
+      while (_isPulling) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      return;
+    }
+    
+    // Perform the pull (which will log)
     await _performPull();
   }
 

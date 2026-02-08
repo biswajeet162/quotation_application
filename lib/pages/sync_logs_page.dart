@@ -21,6 +21,25 @@ class _SyncLogsPageState extends State<SyncLogsPage> {
   void initState() {
     super.initState();
     _loadLogs();
+    // Listen for new log entries
+    _logsService.onLogAdded = () {
+      if (mounted) {
+        _loadLogs();
+      }
+    };
+  }
+  
+  @override
+  void dispose() {
+    _logsService.onLogAdded = null;
+    super.dispose();
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh logs when page becomes visible
+    _loadLogs();
   }
 
   Future<void> _loadLogs() async {

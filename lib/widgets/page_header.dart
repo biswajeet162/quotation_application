@@ -26,12 +26,11 @@ class PageHeader extends StatefulWidget {
 }
 
 class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateMixin {
-  bool _isPulling = false;
-  bool _isPushing = false;
-  int _pushCount = 0;
-  int _pullCount = 0;
+  bool _isSyncing = false;
+  int _syncCount = 0;
   AnimationController? _rotationController;
   bool _isGoogleDriveSignedIn = false;
+  bool _showGreenRotation = false;
 
   @override
   void initState() {
@@ -46,28 +45,14 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
     // Start periodic check to update status
     _startPeriodicCheck();
     
-    // Listen to auto-sync state changes
-    AutoSyncService.instance.onPushStateChanged = () {
-      if (mounted && _rotationController != null) {
-        setState(() {
-          _isPushing = AutoSyncService.instance.isPushing;
-          _pushCount = AutoSyncService.instance.pushCount;
-        });
-        if (_isPushing) {
-          _rotationController!.repeat();
-        } else {
-          _rotationController!.stop();
-          _rotationController!.reset();
-        }
-      }
-    };
+    // Listen to auto-sync state changes (only pull for the sync icon)
     AutoSyncService.instance.onPullStateChanged = () {
       if (mounted && _rotationController != null) {
         setState(() {
-          _isPulling = AutoSyncService.instance.isPulling;
-          _pullCount = AutoSyncService.instance.pullCount;
+          _isSyncing = AutoSyncService.instance.isPulling;
+          _syncCount = AutoSyncService.instance.pullCount;
         });
-        if (_isPulling) {
+        if (_isSyncing) {
           _rotationController!.repeat();
         } else {
           _rotationController!.stop();
@@ -76,12 +61,10 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
       }
     };
     // Initialize state
-    _isPushing = AutoSyncService.instance.isPushing;
-    _isPulling = AutoSyncService.instance.isPulling;
-    _pushCount = AutoSyncService.instance.pushCount;
-    _pullCount = AutoSyncService.instance.pullCount;
+    _isSyncing = AutoSyncService.instance.isPulling;
+    _syncCount = AutoSyncService.instance.pullCount;
     
-    if (_isPushing || _isPulling) {
+    if (_isSyncing) {
       _rotationController!.repeat();
     }
   }
@@ -89,7 +72,6 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
   @override
   void dispose() {
     _rotationController?.dispose();
-    AutoSyncService.instance.onPushStateChanged = null;
     AutoSyncService.instance.onPullStateChanged = null;
     super.dispose();
   }
@@ -144,7 +126,7 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
   }
 
   Future<void> _syncNow() async {
-    final isAuthenticated = GoogleAuthService.instance.isSignedIn;
+    final isAuthenticated = await GoogleAuthService.instance.loadStoredTokens();
     if (!isAuthenticated) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -157,7 +139,32 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
       return;
     }
 
-    // Trigger immediate pull
+    // Start green rotation animation for 2 seconds immediately
+    if (mounted && _rotationController != null) {
+      setState(() {
+        _showGreenRotation = true;
+      });
+      // Start rotation immediately
+      if (!_rotationController!.isAnimating) {
+        _rotationController!.repeat();
+      }
+      
+      // Stop green rotation after 2 seconds
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _showGreenRotation = false;
+          });
+          // Only stop if not actually syncing
+          if (!_isSyncing && _rotationController != null) {
+            _rotationController!.stop();
+            _rotationController!.reset();
+          }
+        }
+      });
+    }
+
+    // Trigger immediate pull for quotations, users, and companies
     await AutoSyncService.instance.performPull();
     
     if (mounted) {
@@ -237,62 +244,13 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // PUSH Icon (Red) - Shows when data is being pushed
+                    // Single Sync Icon - Click to pull quotations, users, and companies
                     Tooltip(
-                      message: _isPushing 
-                          ? 'Pushing $_pushCount item(s) to Google Drive...' 
-                          : 'PUSH: Auto-uploads changes',
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _rotationController != null
-                              ? AnimatedBuilder(
-                                  animation: _rotationController!,
-                                  builder: (context, child) {
-                                    return Transform.rotate(
-                                      angle: _isPushing ? _rotationController!.value * 2 * 3.14159 : 0,
-                                      child: Icon(
-                                        Icons.sync,
-                                        color: _isPushing ? Colors.red : Colors.grey,
-                                        size: 20,
-                                      ),
-                                    );
-                                  },
-                                )
-                              : Icon(
-                                  Icons.sync,
-                                  color: _isPushing ? Colors.red : Colors.grey,
-                                  size: 20,
-                                ),
-                          if (_isPushing && _pushCount > 0) ...[
-                            const SizedBox(width: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                '$_pushCount',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // PULL Icon (Green) - Shows when data is being pulled
-                    Tooltip(
-                      message: _isPulling 
-                          ? 'Pulling $_pullCount item(s) from Google Drive...' 
-                          : 'PULL: Fetch updates (click to sync now)',
+                      message: _isSyncing || _showGreenRotation
+                          ? 'Syncing $_syncCount item(s) from Google Drive...' 
+                          : 'Sync: Pull quotations, users, and companies from Google Drive',
                       child: GestureDetector(
-                        onTap: _isPulling ? null : _syncNow,
+                        onTap: (_isSyncing || _showGreenRotation) ? null : _syncNow,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -300,11 +258,15 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
                                 ? AnimatedBuilder(
                                     animation: _rotationController!,
                                     builder: (context, child) {
+                                      final isRotating = _isSyncing || _showGreenRotation;
+                                      final iconColor = _showGreenRotation 
+                                          ? Colors.green 
+                                          : (_isSyncing ? Colors.blue : Colors.grey);
                                       return Transform.rotate(
-                                        angle: _isPulling ? _rotationController!.value * 2 * 3.14159 : 0,
+                                        angle: isRotating ? _rotationController!.value * 2 * 3.14159 : 0,
                                         child: Icon(
                                           Icons.sync,
-                                          color: _isPulling ? Colors.green : Colors.grey,
+                                          color: iconColor,
                                           size: 20,
                                         ),
                                       );
@@ -312,19 +274,21 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
                                   )
                                 : Icon(
                                     Icons.sync,
-                                    color: _isPulling ? Colors.green : Colors.grey,
+                                    color: _showGreenRotation 
+                                        ? Colors.green 
+                                        : (_isSyncing ? Colors.blue : Colors.grey),
                                     size: 20,
                                   ),
-                            if (_isPulling && _pullCount > 0) ...[
+                            if ((_isSyncing || _showGreenRotation) && _syncCount > 0) ...[
                               const SizedBox(width: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Colors.green,
+                                  color: _showGreenRotation ? Colors.green : Colors.blue,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  '$_pullCount',
+                                  '$_syncCount',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 11,
