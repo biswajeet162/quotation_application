@@ -4,6 +4,7 @@ import '../database/database_helper.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../widgets/page_header.dart';
+import '../utils/google_drive_auth_helper.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -35,6 +36,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
   Future<void> _showCreateUserDialog() async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController();
     final emailController = TextEditingController();
@@ -227,6 +234,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
   Future<void> _showResetPasswordDialog(User user) async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     final formKey = GlobalKey<FormState>();
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
@@ -430,6 +443,12 @@ class _UserManagementPageState extends State<UserManagementPage> {
   }
 
   Future<void> _deleteUser(User user) async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

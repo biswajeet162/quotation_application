@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/auth_service.dart';
 import '../widgets/page_header.dart';
+import '../utils/google_drive_auth_helper.dart';
 
 class PasswordResetPage extends StatefulWidget {
   final String userEmail;
@@ -34,6 +35,12 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
   }
 
   Future<void> _handleResetPassword() async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }

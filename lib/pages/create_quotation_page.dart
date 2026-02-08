@@ -10,6 +10,7 @@ import '../services/auth_service.dart';
 import '../services/pdf_service.dart';
 import 'quotation_preview_page.dart';
 import '../widgets/page_header.dart';
+import '../utils/google_drive_auth_helper.dart';
 
 // Wrapper class for autocomplete options
 class CompanyOption {
@@ -348,6 +349,12 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   }
 
   Future<void> _downloadQuotation() async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     // Validate required fields
     if (_customerNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -459,6 +466,12 @@ class _CreateQuotationPageState extends State<CreateQuotationPage> {
   }
 
   Future<void> _saveQuotation() async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     // Validate required fields
     if (_customerNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -5,6 +5,7 @@ import '../models/my_company.dart';
 import '../services/pdf_service.dart';
 // import '../services/email_service.dart'; // Email feature commented out for now
 import '../database/database_helper.dart';
+import '../utils/google_drive_auth_helper.dart';
 
 class QuotationPreviewPage extends StatelessWidget {
   final String quotationNumber;
@@ -46,6 +47,12 @@ class QuotationPreviewPage extends StatelessWidget {
   }
 
   Future<void> _downloadQuotation(BuildContext context) async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     final totals = _calculateTotals();
     await PdfService.generateAndSaveQuotation(
       context: context,

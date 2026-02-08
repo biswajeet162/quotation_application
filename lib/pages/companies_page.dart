@@ -3,6 +3,7 @@ import '../database/database_helper.dart';
 import '../models/company.dart';
 import '../widgets/page_header.dart';
 import 'package:intl/intl.dart';
+import '../utils/google_drive_auth_helper.dart';
 
 class CompaniesPage extends StatefulWidget {
   const CompaniesPage({super.key});
@@ -34,6 +35,12 @@ class _CompaniesPageState extends State<CompaniesPage> {
   }
 
   Future<void> _showAddEditCompanyDialog({Company? company}) async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: company?.name ?? '');
     final addressController = TextEditingController(text: company?.address ?? '');
@@ -199,6 +206,12 @@ class _CompaniesPageState extends State<CompaniesPage> {
   }
 
   Future<void> _deleteCompany(Company company) async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

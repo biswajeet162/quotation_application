@@ -4,6 +4,7 @@ import '../database/database_helper.dart';
 import '../models/quotation_history.dart';
 import '../widgets/page_header.dart';
 import 'quotation_preview_page.dart';
+import '../utils/google_drive_auth_helper.dart';
 
 class QuotationHistoryPage extends StatefulWidget {
   const QuotationHistoryPage({super.key});
@@ -178,6 +179,12 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
   }
 
   Future<void> _deleteQuotation(QuotationHistory quotation) async {
+    // Check Google Drive sign-in
+    final isSignedIn = await GoogleDriveAuthHelper.checkAndShowNotificationIfNotSignedIn(context);
+    if (!isSignedIn) {
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
