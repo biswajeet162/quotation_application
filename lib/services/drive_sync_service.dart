@@ -52,6 +52,13 @@ class DriveSyncService {
         return result;
       }
 
+      // Check if this is first-time setup (empty database)
+      // If so, force full sync to download all data
+      if (!forceFullSync && await _isFirstTimeSetup()) {
+        debugPrint('First-time setup detected - forcing full sync');
+        forceFullSync = true;
+      }
+
       final lastSync = await _getLastSyncTime();
       final syncStartTime = DateTime.now();
 
@@ -67,6 +74,38 @@ class DriveSyncService {
     }
 
     return result;
+  }
+
+  /// Check if this is a first-time setup (database is mostly empty)
+  /// Returns true if database has only default admin user and no other data
+  Future<bool> _isFirstTimeSetup() async {
+    try {
+      final db = await _db.database;
+      
+      // Check if users table has more than just the default admin
+      final users = await db.query('users');
+      final hasOnlyDefaultAdmin = users.length <= 1 && 
+          (users.isEmpty || users.first['email'] == 'admin@gmail.com');
+      
+      // Check if companies table is empty or has only dummy data
+      final companies = await db.query('companies');
+      final hasNoRealCompanies = companies.isEmpty;
+      
+      // Check if quotations_history is empty
+      final quotations = await db.query('quotations_history');
+      final hasNoQuotations = quotations.isEmpty;
+      
+      // Check if my_company is not set
+      final myCompany = await _db.getMyCompany();
+      final hasNoMyCompany = myCompany == null;
+      
+      // First-time setup if: only default admin exists, no companies, no quotations, no my_company
+      return hasOnlyDefaultAdmin && hasNoRealCompanies && hasNoQuotations && hasNoMyCompany;
+    } catch (e) {
+      debugPrint('Error checking first-time setup: $e');
+      // If we can't check, assume it's not first-time to be safe
+      return false;
+    }
   }
 
   /// Full sync - both push and pull
