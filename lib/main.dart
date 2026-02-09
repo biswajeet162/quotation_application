@@ -24,8 +24,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthService(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider.value(value: GoogleAuthService.instance),
+      ],
       child: MaterialApp(
         title: 'Quotation Application',
         theme: ThemeData(

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
@@ -7,7 +8,7 @@ import 'package:http/http.dart' as http;
 import 'secure_storage_service.dart';
 import 'desktop_oauth_service.dart';
 
-class GoogleAuthService {
+class GoogleAuthService extends ChangeNotifier {
   static final GoogleAuthService instance = GoogleAuthService._init();
   GoogleAuthService._init();
 
@@ -55,6 +56,7 @@ class GoogleAuthService {
           if (!verified) {
             throw Exception('Failed to verify Google Drive access. Please check permissions.');
           }
+          notifyListeners(); // Notify listeners of successful sign-in
           return true;
         }
         return false;
@@ -88,6 +90,7 @@ class GoogleAuthService {
         if (!verified) {
           throw Exception('Failed to verify Google Drive access. Please check permissions.');
         }
+        notifyListeners(); // Notify listeners of successful sign-in
         return true;
       }
     } catch (e) {
@@ -121,7 +124,11 @@ class GoogleAuthService {
         value: _tokenExpiry!.toIso8601String(),
       );
 
-      return await verifyDriveAccess();
+      final verified = await verifyDriveAccess();
+      if (verified) {
+        notifyListeners(); // Notify listeners when silently signed in
+      }
+      return verified;
     } catch (e) {
       return false;
     }
@@ -140,6 +147,7 @@ class GoogleAuthService {
       _currentUser = null;
       _accessToken = null;
       _tokenExpiry = null;
+      notifyListeners(); // Notify listeners of sign-out
     } catch (e) {
       // Ignore errors during sign out
     }
@@ -148,7 +156,12 @@ class GoogleAuthService {
   Future<bool> loadStoredTokens() async {
     try {
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-        return await DesktopOAuthService.instance.loadStoredTokens();
+        final result = await DesktopOAuthService.instance.loadStoredTokens();
+        if (result) {
+          _accessToken = DesktopOAuthService.instance.accessToken;
+          notifyListeners(); // Notify listeners when tokens are loaded
+        }
+        return result;
       } else {
         final storedToken = await _storage.read(key: _accessTokenKey);
         final storedExpiry = await _storage.read(key: _expiryKey);
@@ -168,7 +181,11 @@ class GoogleAuthService {
         final account = await _googleSignIn.signInSilently();
         if (account != null) {
           _currentUser = account;
-          return await verifyDriveAccess();
+          final verified = await verifyDriveAccess();
+          if (verified) {
+            notifyListeners(); // Notify listeners when tokens are loaded
+          }
+          return verified;
         }
 
         return false;
@@ -203,6 +220,7 @@ class GoogleAuthService {
         value: _tokenExpiry!.toIso8601String(),
       );
 
+      notifyListeners(); // Notify listeners when token is refreshed
       return true;
     } catch (e) {
       return false;
@@ -211,7 +229,13 @@ class GoogleAuthService {
 
   Future<String?> getValidAccessToken() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      return await DesktopOAuthService.instance.getValidAccessToken();
+      final token = await DesktopOAuthService.instance.getValidAccessToken();
+      // Sync the token from DesktopOAuthService to this service
+      if (token != null && _accessToken != token) {
+        _accessToken = token;
+        notifyListeners(); // Notify if token was refreshed
+      }
+      return token;
     }
     
     if (_accessToken == null || _tokenExpiry == null) {

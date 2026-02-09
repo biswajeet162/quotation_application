@@ -143,9 +143,6 @@ class DatabaseHelper {
 
     // Create default admin user
     await _createDefaultAdmin(db);
-    
-    // Insert dummy companies data
-    await _insertDummyCompanies(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -238,8 +235,6 @@ class DatabaseHelper {
           createdAt TEXT NOT NULL
         )
       ''');
-      // Insert dummy companies data
-      await _insertDummyCompanies(db);
     }
     if (oldVersion < 6) {
       // Add quotations_history table
@@ -470,59 +465,6 @@ class DatabaseHelper {
     }
   }
 
-  Future<void> _insertDummyCompanies(Database db) async {
-    try {
-      // Check if companies table exists and has data
-      final existingCompanies = await db.query('companies');
-      if (existingCompanies.isNotEmpty) {
-        return; // Don't insert if companies already exist
-      }
-
-      final dummyCompanies = [
-        {
-          'name': 'ABC Corporation',
-          'address': '123 Business Street, Mumbai, Maharashtra 400001',
-          'mobile': '+91 98765 43210',
-          'email': 'contact@abccorp.com',
-          'createdAt': DateTime.now().subtract(const Duration(days: 30)).toIso8601String(),
-        },
-        {
-          'name': 'XYZ Industries Ltd',
-          'address': '456 Industrial Area, Delhi, Delhi 110001',
-          'mobile': '+91 98765 43211',
-          'email': 'info@xyzindustries.com',
-          'createdAt': DateTime.now().subtract(const Duration(days: 25)).toIso8601String(),
-        },
-        {
-          'name': 'Tech Solutions Pvt Ltd',
-          'address': '789 Tech Park, Bangalore, Karnataka 560001',
-          'mobile': '+91 98765 43212',
-          'email': 'sales@techsolutions.in',
-          'createdAt': DateTime.now().subtract(const Duration(days: 20)).toIso8601String(),
-        },
-        {
-          'name': 'Global Trading Company',
-          'address': '321 Trade Center, Chennai, Tamil Nadu 600001',
-          'mobile': '+91 98765 43213',
-          'email': 'info@globaltrading.co.in',
-          'createdAt': DateTime.now().subtract(const Duration(days: 15)).toIso8601String(),
-        },
-        {
-          'name': 'Prime Manufacturing Co',
-          'address': '654 Factory Road, Pune, Maharashtra 411001',
-          'mobile': '+91 98765 43214',
-          'email': 'contact@primemanufacturing.com',
-          'createdAt': DateTime.now().subtract(const Duration(days: 10)).toIso8601String(),
-        },
-      ];
-
-      for (var company in dummyCompanies) {
-        await db.insert('companies', company);
-      }
-    } catch (e) {
-      // Companies might already exist or table doesn't exist yet, ignore error
-    }
-  }
 
   String _hashPassword(String password) {
     final bytes = utf8.encode(password);

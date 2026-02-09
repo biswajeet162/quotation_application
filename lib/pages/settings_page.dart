@@ -268,8 +268,18 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final isAdmin = authService.isAdmin;
+    
+    // Listen to GoogleAuthService changes and update status when it changes
+    return Consumer<GoogleAuthService>(
+      builder: (context, googleAuthService, child) {
+        // Update auth status when GoogleAuthService notifies
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _checkAuthStatus();
+          }
+        });
 
-    return Scaffold(
+        return Scaffold(
       body: Column(
         children: [
           const PageHeader(
@@ -623,6 +633,8 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
