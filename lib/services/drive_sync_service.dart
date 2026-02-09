@@ -426,18 +426,26 @@ class DriveSyncService {
     SyncResult result,
   ) async {
     try {
-      final files = await _driveService.listFilesInFolder(
+      // Get all files in Drive (not filtered by modifiedAfter for deletion detection)
+      final allFilesInDrive = await _driveService.listFilesInFolder(
         'users',
-        modifiedAfter: forceFullSync ? null : lastSync,
+        modifiedAfter: null, // Get all files to detect deletions
       );
 
       final db = await _db.database;
 
-      for (final file in files) {
+      // Create a set of user IDs that exist in Drive
+      final Set<int> driveUserIds = {};
+      final Map<int, drive.File> driveFilesMap = {};
+
+      for (final file in allFilesInDrive) {
         try {
           final content = await _driveService.downloadFile(file.id!);
           final data = jsonDecode(content) as Map<String, dynamic>;
           final remoteUserId = data['id'] as int;
+          driveUserIds.add(remoteUserId);
+          driveFilesMap[remoteUserId] = file;
+
           final remoteEmail = data['email'] as String;
 
           // Check by ID first (primary key)
@@ -521,6 +529,30 @@ class DriveSyncService {
           debugPrint('Error downloading user ${file.name}: $e');
         }
       }
+
+      // Check for deletions: Find local users that don't exist in Drive
+      // Always check for deletions to keep local DB in sync with Drive
+      {
+        final allLocalUsers = await db.query('users');
+        for (final localUser in allLocalUsers) {
+          final localUserId = localUser['id'] as int;
+          // Don't delete the default admin user
+          if (localUser['email'] == 'admin@gmail.com') {
+            continue;
+          }
+          
+          // If local user doesn't exist in Drive, delete it from local DB
+          if (!driveUserIds.contains(localUserId)) {
+            try {
+              await db.delete('users', where: 'id = ?', whereArgs: [localUserId]);
+              result.usersDeleted = (result.usersDeleted ?? 0) + 1;
+              debugPrint('Deleted user $localUserId from local DB (not found in Drive)');
+            } catch (e) {
+              debugPrint('Error deleting user $localUserId: $e');
+            }
+          }
+        }
+      }
     } catch (e) {
       debugPrint('Error downloading users: $e');
     }
@@ -532,22 +564,28 @@ class DriveSyncService {
     SyncResult result,
   ) async {
     try {
+      // Get all files in Drive (not filtered by modifiedAfter for deletion detection)
       final files = await _driveService.listFilesInFolder(
         'companies',
-        modifiedAfter: forceFullSync ? null : lastSync,
+        modifiedAfter: null, // Get all files to detect deletions
       );
 
       final db = await _db.database;
+      
+      // Create a set of company IDs that exist in Drive
+      final Set<int> driveCompanyIds = {};
 
       for (final file in files) {
         try {
           final content = await _driveService.downloadFile(file.id!);
           final data = jsonDecode(content) as Map<String, dynamic>;
+          final companyId = data['id'] as int;
+          driveCompanyIds.add(companyId);
 
           final localCompany = await db.query(
             'companies',
             where: 'id = ?',
-            whereArgs: [data['id']],
+            whereArgs: [companyId],
           );
 
           if (localCompany.isEmpty) {
@@ -565,12 +603,32 @@ class DriveSyncService {
               fileModifiedTime: fileModifiedTime,
             );
             if (merged != null) {
-              await db.update('companies', merged, where: 'id = ?', whereArgs: [data['id']]);
+              await db.update('companies', merged, where: 'id = ?', whereArgs: [companyId]);
               result.companiesMerged++;
             }
           }
         } catch (e) {
           debugPrint('Error downloading company ${file.name}: $e');
+        }
+      }
+
+      // Check for deletions: Find local companies that don't exist in Drive
+      // Always check for deletions to keep local DB in sync with Drive
+      {
+        final allLocalCompanies = await db.query('companies');
+        for (final localCompany in allLocalCompanies) {
+          final localCompanyId = localCompany['id'] as int;
+          
+          // If local company doesn't exist in Drive, delete it from local DB
+          if (!driveCompanyIds.contains(localCompanyId)) {
+            try {
+              await db.delete('companies', where: 'id = ?', whereArgs: [localCompanyId]);
+              result.companiesDeleted++;
+              debugPrint('Deleted company $localCompanyId from local DB (not found in Drive)');
+            } catch (e) {
+              debugPrint('Error deleting company $localCompanyId: $e');
+            }
+          }
         }
       }
     } catch (e) {
@@ -602,15 +660,12 @@ class DriveSyncService {
 
       final db = await _db.database;
 
+      // Create a set of quotation IDs that exist in Drive
+      final Set<int> driveQuotationIds = {};
+
       for (final yearFolder in yearFolders.files ?? []) {
+        // Get all files (not filtered) to detect deletions
         String fileQuery = "'${yearFolder.id}' in parents and trashed=false";
-        if (!forceFullSync && lastSync != null) {
-          // Subtract 2 hours buffer to account for clock differences and ensure we don't miss files
-          // that were uploaded just before the last sync time
-          final bufferTime = lastSync.subtract(const Duration(hours: 2));
-          final timeStr = bufferTime.toUtc().toIso8601String();
-          fileQuery += " and modifiedTime > '$timeStr'";
-        }
 
         final files = await driveApi.files.list(
           q: fileQuery,
@@ -621,6 +676,8 @@ class DriveSyncService {
           try {
             final content = await _driveService.downloadFile(file.id!);
             final data = jsonDecode(content) as Map<String, dynamic>;
+            final quotationId = data['id'] as int;
+            driveQuotationIds.add(quotationId);
 
             // Check by ID first (primary key) - this is the most reliable check
             final localQuotationById = await db.query(
@@ -645,7 +702,7 @@ class DriveSyncService {
                   'quotations_history',
                   merged,
                   where: 'id = ?',
-                  whereArgs: [data['id']],
+                  whereArgs: [quotationId],
                 );
                 result.quotationsMerged++;
               }
@@ -687,6 +744,26 @@ class DriveSyncService {
             }
           } catch (e) {
             debugPrint('Error downloading quotation ${file.name}: $e');
+          }
+        }
+      }
+
+      // Check for deletions: Find local quotations that don't exist in Drive
+      // Always check for deletions to keep local DB in sync with Drive
+      {
+        final allLocalQuotations = await db.query('quotations_history');
+        for (final localQuotation in allLocalQuotations) {
+          final localQuotationId = localQuotation['id'] as int;
+          
+          // If local quotation doesn't exist in Drive, delete it from local DB
+          if (!driveQuotationIds.contains(localQuotationId)) {
+            try {
+              await db.delete('quotations_history', where: 'id = ?', whereArgs: [localQuotationId]);
+              result.quotationsDeleted++;
+              debugPrint('Deleted quotation $localQuotationId from local DB (not found in Drive)');
+            } catch (e) {
+              debugPrint('Error deleting quotation $localQuotationId: $e');
+            }
           }
         }
       }
@@ -1187,6 +1264,9 @@ class SyncResult {
   int companiesMerged = 0;
   int quotationsMerged = 0;
   bool myCompanyMerged = false;
+  int usersDeleted = 0;
+  int companiesDeleted = 0;
+  int quotationsDeleted = 0;
   final List<String> errors = [];
 }
 

@@ -200,11 +200,17 @@ class AutoSyncService {
       final result = await DriveSyncService.instance.pullOnly(forceFullSync: false);
       _pullCount = result.usersDownloaded + result.companiesDownloaded + result.quotationsDownloaded;
       
+      // Build sync message including deletions
+      String syncMessage = 'Pulled ${result.usersDownloaded} user(s), ${result.companiesDownloaded} company(ies), ${result.quotationsDownloaded} quotation(s)';
+      if (result.usersDeleted > 0 || result.companiesDeleted > 0 || result.quotationsDeleted > 0) {
+        syncMessage += ' | Deleted: ${result.usersDeleted} user(s), ${result.companiesDeleted} company(ies), ${result.quotationsDeleted} quotation(s)';
+      }
+      
       // Log the pull operation
       await SyncLogsService.instance.addLog(SyncLog(
         type: SyncLogType.pull,
         timestamp: DateTime.now(),
-        message: 'Pulled ${result.usersDownloaded} user(s), ${result.companiesDownloaded} company(ies), ${result.quotationsDownloaded} quotation(s)',
+        message: syncMessage,
         itemCount: _pullCount,
         success: result.success,
         error: result.errors.isNotEmpty ? result.errors.join('; ') : null,

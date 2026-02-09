@@ -123,3 +123,4 @@ static const String clientId = '123456789-abc...xyz.apps.googleusercontent.com';
 
 See detailed guide: `OAUTH_CONFIGURATION_GUIDE.md`
 
+
