@@ -7,10 +7,10 @@ class SyncLogsPage extends StatefulWidget {
   const SyncLogsPage({super.key});
 
   @override
-  State<SyncLogsPage> createState() => _SyncLogsPageState();
+  State<SyncLogsPage> createState() => SyncLogsPageState();
 }
 
-class _SyncLogsPageState extends State<SyncLogsPage> {
+class SyncLogsPageState extends State<SyncLogsPage> {
   final SyncLogsService _logsService = SyncLogsService.instance;
   List<SyncLog> _logs = [];
   bool _isLoading = true;
@@ -40,6 +40,12 @@ class _SyncLogsPageState extends State<SyncLogsPage> {
     super.didChangeDependencies();
     // Refresh logs when page becomes visible
     _loadLogs();
+  }
+
+  void reloadData() {
+    if (mounted) {
+      _loadLogs();
+    }
   }
 
   Future<void> _loadLogs() async {

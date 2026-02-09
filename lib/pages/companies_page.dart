@@ -9,10 +9,10 @@ class CompaniesPage extends StatefulWidget {
   const CompaniesPage({super.key});
 
   @override
-  State<CompaniesPage> createState() => _CompaniesPageState();
+  State<CompaniesPage> createState() => CompaniesPageState();
 }
 
-class _CompaniesPageState extends State<CompaniesPage> {
+class CompaniesPageState extends State<CompaniesPage> {
   List<Company> _companies = [];
   bool _isLoading = true;
 
@@ -20,6 +20,12 @@ class _CompaniesPageState extends State<CompaniesPage> {
   void initState() {
     super.initState();
     _loadCompanies();
+  }
+
+  void reloadData() {
+    if (mounted) {
+      _loadCompanies();
+    }
   }
 
   Future<void> _loadCompanies() async {
@@ -267,13 +273,23 @@ class _CompaniesPageState extends State<CompaniesPage> {
           PageHeader(
             title: 'Companies',
             count: _companies.length,
-            actionButton: IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () => _showAddEditCompanyDialog(),
-              tooltip: 'Add New Company',
-              style: IconButton.styleFrom(
-                padding: const EdgeInsets.all(12),
-              ),
+            actionButton: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadCompanies,
+                  tooltip: 'Refresh Companies',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _showAddEditCompanyDialog(),
+                  tooltip: 'Add New Company',
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(12),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(

@@ -70,6 +70,10 @@ class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   bool _hasQuotationData = false;
   final GlobalKey<QuotationHistoryPageState> _quotationHistoryKey = GlobalKey<QuotationHistoryPageState>();
+  final GlobalKey<ProductsPageState> _productsPageKey = GlobalKey<ProductsPageState>();
+  final GlobalKey<CompaniesPageState> _companiesPageKey = GlobalKey<CompaniesPageState>();
+  final GlobalKey<UserManagementPageState> _userManagementPageKey = GlobalKey<UserManagementPageState>();
+  final GlobalKey<SyncLogsPageState> _syncLogsPageKey = GlobalKey<SyncLogsPageState>();
 
   @override
   void initState() {
@@ -104,20 +108,20 @@ class _MainScreenState extends State<MainScreen> {
     final isAdmin = authService.isAdmin;
     
     final pages = [
-      const ProductsPage(),
+      ProductsPage(key: _productsPageKey),
       const PlaceholderPage(title: 'Dashboard'),
       CreateQuotationPage(
         onDataChanged: _updateQuotationDataStatus,
       ),
       QuotationHistoryPage(key: _quotationHistoryKey),
-      const CompaniesPage(),
-      const SyncLogsPage(),
+      CompaniesPage(key: _companiesPageKey),
+      SyncLogsPage(key: _syncLogsPageKey),
       SettingsPage(userEmail: authService.currentUser?.email ?? ''),
     ];
 
     // Insert user management page for admin (index 5, before Sync Monitor)
     if (isAdmin) {
-      pages.insert(5, const UserManagementPage());
+      pages.insert(5, UserManagementPage(key: _userManagementPageKey));
     }
 
     return pages;
@@ -135,13 +139,40 @@ class _MainScreenState extends State<MainScreen> {
       _selectedIndex = index;
     });
     
-    // Reload quotation history when that tab is selected (always at index 3)
-    if (index == 3) {
-      // Small delay to ensure the widget is built
-      Future.delayed(const Duration(milliseconds: 100), () {
-        _quotationHistoryKey.currentState?.reloadData();
-      });
-    }
+    // Get admin status before the async callback
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final isAdmin = authService.isAdmin;
+    
+    // Reload data from local database when switching tabs
+    // Small delay to ensure the widget is built
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      
+      switch (index) {
+        case 0: // ProductsPage
+          _productsPageKey.currentState?.reloadData();
+          break;
+        case 3: // QuotationHistoryPage
+          _quotationHistoryKey.currentState?.reloadData();
+          break;
+        case 4: // CompaniesPage
+          _companiesPageKey.currentState?.reloadData();
+          break;
+        case 5: // UserManagementPage (if admin) or SyncLogsPage (if not admin)
+          if (isAdmin) {
+            _userManagementPageKey.currentState?.reloadData();
+          } else {
+            _syncLogsPageKey.currentState?.reloadData();
+          }
+          break;
+        case 6: // SyncLogsPage (if admin) or SettingsPage (if not admin)
+          if (isAdmin) {
+            _syncLogsPageKey.currentState?.reloadData();
+          }
+          break;
+        // Dashboard (1), CreateQuotationPage (2), and SettingsPage don't need reload
+      }
+    });
   }
 
   @override

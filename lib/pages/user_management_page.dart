@@ -12,10 +12,10 @@ class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
 
   @override
-  State<UserManagementPage> createState() => _UserManagementPageState();
+  State<UserManagementPage> createState() => UserManagementPageState();
 }
 
-class _UserManagementPageState extends State<UserManagementPage> {
+class UserManagementPageState extends State<UserManagementPage> {
   List<User> _users = [];
   bool _isLoading = true;
   bool _isGoogleDriveSignedIn = false;
@@ -50,6 +50,13 @@ class _UserManagementPageState extends State<UserManagementPage> {
     _checkGoogleDriveStatus();
     // Reload users when page becomes visible (in case new users were synced)
     _loadUsers();
+  }
+
+  void reloadData() {
+    if (mounted) {
+      _loadUsers();
+      _checkGoogleDriveStatus();
+    }
   }
 
   Future<void> _checkGoogleDriveStatus() async {

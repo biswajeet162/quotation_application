@@ -13,10 +13,10 @@ class ProductsPage extends StatefulWidget {
   const ProductsPage({super.key});
 
   @override
-  State<ProductsPage> createState() => _ProductsPageState();
+  State<ProductsPage> createState() => ProductsPageState();
 }
 
-class _ProductsPageState extends State<ProductsPage> {
+class ProductsPageState extends State<ProductsPage> {
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final ExcelImportService _importService = ExcelImportService();
   final TextEditingController _searchController = TextEditingController();
@@ -38,6 +38,12 @@ class _ProductsPageState extends State<ProductsPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void reloadData() {
+    if (mounted) {
+      _loadProducts();
+    }
   }
 
   void _onSearchChanged() {
