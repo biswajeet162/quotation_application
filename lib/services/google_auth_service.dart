@@ -229,6 +229,14 @@ class GoogleAuthService extends ChangeNotifier {
 
   Future<String?> getValidAccessToken() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      // Only load tokens if we don't have a valid one
+      if (_accessToken == null || _tokenExpiry == null || _tokenExpiry!.isBefore(DateTime.now())) {
+        // Try to load/refresh tokens
+        final loaded = await DesktopOAuthService.instance.loadStoredTokens();
+        if (!loaded) {
+          return null;
+        }
+      }
       final token = await DesktopOAuthService.instance.getValidAccessToken();
       // Sync the token from DesktopOAuthService to this service
       if (token != null && _accessToken != token) {

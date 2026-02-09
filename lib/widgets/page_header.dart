@@ -115,9 +115,9 @@ class _PageHeaderState extends State<PageHeader> with SingleTickerProviderStateM
     _checkGoogleDriveStatus();
   }
 
-  // Periodic check to update Google Drive status
+  // Periodic check to update Google Drive status (less frequent to avoid flooding)
   void _startPeriodicCheck() {
-    Future.delayed(const Duration(seconds: 2), () {
+    Future.delayed(const Duration(seconds: 30), () {
       if (mounted) {
         _checkGoogleDriveStatus();
         _startPeriodicCheck(); // Schedule next check

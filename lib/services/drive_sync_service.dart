@@ -143,6 +143,12 @@ class DriveSyncService {
   }
 
   Future<int> _syncUsers(DateTime? lastSync, bool forceFullSync) async {
+    // Check authentication before starting sync
+    if (!await GoogleAuthService.instance.loadStoredTokens()) {
+      debugPrint('Not authenticated - skipping user sync');
+      return 0;
+    }
+
     final db = await _db.database;
     int synced = 0;
 
@@ -153,6 +159,14 @@ class DriveSyncService {
 
     for (final userMap in pendingUsers) {
       try {
+        // Check authentication before each sync operation
+        if (!GoogleAuthService.instance.isSignedIn) {
+          if (!await GoogleAuthService.instance.loadStoredTokens()) {
+            debugPrint('Authentication lost during sync - stopping user sync');
+            break; // Stop syncing if authentication is lost
+          }
+        }
+
         final user = User.fromMap(userMap);
         final fileName = 'user_${user.id}.json';
         final json = _userToJson(userMap);
@@ -181,6 +195,14 @@ class DriveSyncService {
 
         synced++;
       } catch (e) {
+        // If it's an authentication error, stop syncing
+        if (e.toString().contains('Not authenticated') || 
+            e.toString().contains('authentication') ||
+            e.toString().contains('401') ||
+            e.toString().contains('403')) {
+          debugPrint('Authentication error during user sync - stopping: $e');
+          break; // Stop syncing on authentication errors
+        }
         debugPrint('Error syncing user ${userMap['id']}: $e');
       }
     }

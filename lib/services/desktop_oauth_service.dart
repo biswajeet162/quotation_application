@@ -22,6 +22,12 @@ class DesktopOAuthService {
   String? _accessToken;
   DateTime? _tokenExpiry;
   String? _refreshToken;
+  
+  // Cache to prevent repeated checks
+  bool _hasCheckedTokens = false;
+  bool _tokensExist = false;
+  DateTime? _lastTokenCheck;
+  static const _tokenCheckCacheDuration = Duration(seconds: 30);
 
   String? get accessToken => _accessToken;
   bool get isSignedIn => _accessToken != null;
@@ -207,26 +213,50 @@ class DesktopOAuthService {
         value: _tokenExpiry!.toIso8601String(),
       );
 
+      // Clear cache after successful sign-in
+      _hasCheckedTokens = true;
+      _tokensExist = true;
+      _lastTokenCheck = DateTime.now();
+
       return true;
     } catch (e) {
       rethrow;
     }
   }
 
-  Future<bool> loadStoredTokens() async {
+  Future<bool> loadStoredTokens({bool forceRefresh = false}) async {
     try {
+      // Use cache to prevent repeated checks within short time period
+      final now = DateTime.now();
+      if (!forceRefresh && 
+          _hasCheckedTokens && 
+          _lastTokenCheck != null &&
+          now.difference(_lastTokenCheck!) < _tokenCheckCacheDuration) {
+        // Return cached result if checked recently
+        return _tokensExist;
+      }
+
       final storedToken = await _storage.read(key: _accessTokenKey);
       final storedExpiry = await _storage.read(key: _expiryKey);
       _refreshToken = await _storage.read(key: _refreshTokenKey);
 
+      // Update cache
+      _hasCheckedTokens = true;
+      _lastTokenCheck = now;
+
       // If no tokens stored at all, user needs to sign in
       if (storedToken == null || storedExpiry == null) {
-        debugPrint('No stored tokens found - user needs to sign in');
+        _tokensExist = false;
+        // Only log once per cache period to prevent flooding
+        if (!_hasCheckedTokens || forceRefresh) {
+          debugPrint('No stored tokens found - user needs to sign in');
+        }
         return false;
       }
+      
+      _tokensExist = true;
 
       final expiry = DateTime.parse(storedExpiry);
-      final now = DateTime.now();
       final timeSinceExpiry = now.difference(expiry);
       
       // If token is expired (even by hours/days), refresh it automatically
@@ -248,9 +278,10 @@ class DesktopOAuthService {
       _tokenExpiry = expiry;
       
       // Only log when first loading tokens, not on every check
-      if (!wasAlreadyLoaded) {
+      if (!wasAlreadyLoaded && (forceRefresh || !_hasCheckedTokens)) {
         debugPrint('Stored token loaded, expires in ${expiry.difference(now).inMinutes} minutes');
       }
+      _tokensExist = true;
       return true;
     } catch (e) {
       debugPrint('Error loading stored tokens: $e');
@@ -327,9 +358,13 @@ class DesktopOAuthService {
 
   Future<String?> getValidAccessToken() async {
     if (_accessToken == null || _tokenExpiry == null) {
-      final loaded = await loadStoredTokens();
+      final loaded = await loadStoredTokens(forceRefresh: false);
       if (!loaded) {
-        debugPrint('Failed to load stored tokens');
+        // Only log if we haven't checked recently to avoid flooding
+        if (_lastTokenCheck == null || 
+            DateTime.now().difference(_lastTokenCheck!) > _tokenCheckCacheDuration) {
+          debugPrint('Failed to load stored tokens');
+        }
         return null;
       }
     }
@@ -369,6 +404,10 @@ class DesktopOAuthService {
       _accessToken = null;
       _tokenExpiry = null;
       _refreshToken = null;
+      // Clear cache
+      _hasCheckedTokens = false;
+      _tokensExist = false;
+      _lastTokenCheck = null;
     } catch (e) {
       // Ignore errors
     }
