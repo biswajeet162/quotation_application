@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../widgets/page_header.dart';
 import '../utils/google_drive_auth_helper.dart';
 import '../services/google_auth_service.dart';
+import '../services/auto_sync_service.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -25,6 +26,21 @@ class _UserManagementPageState extends State<UserManagementPage> {
     super.initState();
     _loadUsers();
     _checkGoogleDriveStatus();
+    
+    // Listen for sync completion to refresh users
+    AutoSyncService.instance.onPullStateChanged = () {
+      if (mounted) {
+        // Reload users after pull completes (new users might have been downloaded)
+        _loadUsers();
+      }
+    };
+  }
+  
+  @override
+  void dispose() {
+    // Clean up listener
+    AutoSyncService.instance.onPullStateChanged = null;
+    super.dispose();
   }
 
   @override
@@ -32,6 +48,8 @@ class _UserManagementPageState extends State<UserManagementPage> {
     super.didChangeDependencies();
     // Refresh Google Drive status when page becomes visible
     _checkGoogleDriveStatus();
+    // Reload users when page becomes visible (in case new users were synced)
+    _loadUsers();
   }
 
   Future<void> _checkGoogleDriveStatus() async {
@@ -528,13 +546,20 @@ class _UserManagementPageState extends State<UserManagementPage> {
         children: [
           PageHeader(
             title: 'User Management',
-            actionButton: IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: _showCreateUserDialog,
-              tooltip: 'Create New User',
-              style: IconButton.styleFrom(
-                padding: const EdgeInsets.all(12),
-              ),
+            actionButton: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadUsers,
+                  tooltip: 'Refresh Users',
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: _showCreateUserDialog,
+                  tooltip: 'Create New User',
+                ),
+              ],
             ),
           ),
           Expanded(
