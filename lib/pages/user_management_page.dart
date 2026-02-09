@@ -553,6 +553,7 @@ class UserManagementPageState extends State<UserManagementPage> {
         children: [
           PageHeader(
             title: 'User Management',
+            count: _users.length,
             actionButton: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

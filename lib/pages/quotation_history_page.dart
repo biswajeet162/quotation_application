@@ -672,13 +672,6 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
                       color: Colors.grey[600],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (!_isSelectionMode)
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      tooltip: 'Delete',
-                      onPressed: () => _deleteQuotation(quotation),
-                    ),
                 ],
               ),
             ],
@@ -801,18 +794,6 @@ class QuotationHistoryPageState extends State<QuotationHistoryPage> with Automat
                       foregroundColor: Colors.blue[900],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (_selectedQuotationIds.isNotEmpty)
-                    ElevatedButton.icon(
-                      onPressed: _deleteSelectedQuotations,
-                      icon: const Icon(Icons.delete_outline, size: 20),
-                      label: const Text('Delete Selected'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                    ),
                 ],
               ),
             ),
