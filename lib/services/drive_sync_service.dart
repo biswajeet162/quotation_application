@@ -231,6 +231,27 @@ class DriveSyncService {
     }
   }
 
+  /// Delete a company file from Google Drive
+  Future<bool> deleteCompanyFromDrive(int companyId) async {
+    try {
+      if (!await GoogleAuthService.instance.loadStoredTokens()) {
+        return false;
+      }
+
+      final fileName = 'company_$companyId.json';
+      final fileId = await _driveService.findFileByName(fileName, 'companies');
+      
+      if (fileId != null) {
+        await _driveService.deleteFile(fileId);
+        return true;
+      }
+      return true; // File doesn't exist, consider it deleted
+    } catch (e) {
+      debugPrint('Error deleting company file from Drive: $e');
+      return false;
+    }
+  }
+
   Future<int> _syncCompanies(DateTime? lastSync, bool forceFullSync) async {
     final db = await _db.database;
     int synced = 0;

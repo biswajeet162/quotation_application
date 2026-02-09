@@ -716,8 +716,10 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
-    // Trigger automatic push
-    AutoSyncService.instance.pushSingleRecord(table: 'companies', recordId: id);
+    // Delete from Google Drive immediately
+    if (result > 0) {
+      await DriveSyncService.instance.deleteCompanyFromDrive(id);
+    }
     return result;
   }
 
