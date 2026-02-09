@@ -188,6 +188,27 @@ class DriveSyncService {
     return synced;
   }
 
+  /// Delete a user file from Google Drive
+  Future<bool> deleteUserFromDrive(int userId) async {
+    try {
+      if (!await GoogleAuthService.instance.loadStoredTokens()) {
+        return false;
+      }
+
+      final fileName = 'user_$userId.json';
+      final fileId = await _driveService.findFileByName(fileName, 'users');
+      
+      if (fileId != null) {
+        await _driveService.deleteFile(fileId);
+        return true;
+      }
+      return true; // File doesn't exist, consider it deleted
+    } catch (e) {
+      debugPrint('Error deleting user file from Drive: $e');
+      return false;
+    }
+  }
+
   Future<int> _syncCompanies(DateTime? lastSync, bool forceFullSync) async {
     final db = await _db.database;
     int synced = 0;
@@ -394,31 +415,85 @@ class DriveSyncService {
         try {
           final content = await _driveService.downloadFile(file.id!);
           final data = jsonDecode(content) as Map<String, dynamic>;
+          final remoteUserId = data['id'] as int;
+          final remoteEmail = data['email'] as String;
 
-          final localUser = await db.query(
+          // Check by ID first (primary key)
+          final localUserById = await db.query(
             'users',
             where: 'id = ?',
-            whereArgs: [data['id']],
+            whereArgs: [remoteUserId],
           );
 
-          if (localUser.isEmpty) {
+          // Also check by email (unique constraint)
+          final localUserByEmail = await db.query(
+            'users',
+            where: 'email = ?',
+            whereArgs: [remoteEmail],
+          );
+
+          if (localUserById.isEmpty && localUserByEmail.isEmpty) {
+            // New user - insert it
             await _insertUserFromDrive(data);
             result.usersDownloaded++;
-          } else {
-            // Use file's modifiedTime from Google Drive for conflict resolution
+          } else if (localUserById.isNotEmpty) {
+            // User exists with same ID - update it
             final fileModifiedTime = file.modifiedTime != null 
                 ? DateTime.parse(file.modifiedTime!.toIso8601String())
                 : null;
             final merged = await _resolveConflict(
-              localUser.first, 
+              localUserById.first, 
               data, 
               'users',
               fileModifiedTime: fileModifiedTime,
             );
             if (merged != null) {
-              await db.update('users', merged, where: 'id = ?', whereArgs: [data['id']]);
+              // Before updating, check if the email already exists with a different ID
+              final emailCheck = await db.query(
+                'users',
+                where: 'email = ? AND id != ?',
+                whereArgs: [merged['email'], remoteUserId],
+              );
+              
+              if (emailCheck.isNotEmpty) {
+                // Email exists with different ID - this is a conflict
+                // Delete the old user with different ID first
+                final oldUserId = emailCheck.first['id'] as int;
+                await db.delete('users', where: 'id = ?', whereArgs: [oldUserId]);
+              }
+              
+              // Now safe to update
+              await db.update('users', merged, where: 'id = ?', whereArgs: [remoteUserId]);
               result.usersMerged++;
             }
+          } else if (localUserByEmail.isNotEmpty) {
+            // User exists with same email but different ID - this is a conflict
+            final localUser = localUserByEmail.first;
+            final localUserId = localUser['id'] as int;
+            
+            // If the local user has the same email but different ID, we need to handle this
+            // Option 1: If remote is newer, replace local user (delete old, insert new)
+            // Option 2: If local is newer, skip remote
+            // We'll use conflict resolution to decide
+            final fileModifiedTime = file.modifiedTime != null 
+                ? DateTime.parse(file.modifiedTime!.toIso8601String())
+                : null;
+            final merged = await _resolveConflict(
+              localUser, 
+              data, 
+              'users',
+              fileModifiedTime: fileModifiedTime,
+            );
+            
+            if (merged != null) {
+              // Remote is newer - replace local user
+              // First delete the local user with different ID
+              await db.delete('users', where: 'id = ?', whereArgs: [localUserId]);
+              // Then insert the remote user with its original ID
+              await _insertUserFromDrive(data);
+              result.usersMerged++;
+            }
+            // If merged is null, local is newer, so we skip the remote user
           }
         } catch (e) {
           debugPrint('Error downloading user ${file.name}: $e');

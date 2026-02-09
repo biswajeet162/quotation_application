@@ -10,6 +10,7 @@ import '../models/user.dart';
 import '../models/company.dart';
 import '../models/quotation_history.dart';
 import '../services/auto_sync_service.dart';
+import '../services/drive_sync_service.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -602,12 +603,27 @@ class DatabaseHelper {
   Future<int> updateUserPassword(int userId, String newPassword) async {
     final db = await database;
     final hashedPassword = _hashPassword(newPassword);
-    return await db.update(
+    final now = DateTime.now().toIso8601String();
+    
+    // Get current version
+    final current = await db.query('users', where: 'id = ?', whereArgs: [userId]);
+    final currentVersion = current.isNotEmpty ? (current.first['version'] as int? ?? 1) : 1;
+    
+    final result = await db.update(
       'users',
-      {'password': hashedPassword},
+      {
+        'password': hashedPassword,
+        'version': currentVersion + 1,
+        'sync_status': 'PENDING',
+        'updatedAt': now,
+      },
       where: 'id = ?',
       whereArgs: [userId],
     );
+    
+    // Trigger automatic push
+    AutoSyncService.instance.pushSingleRecord(table: 'users', recordId: userId);
+    return result;
   }
 
   Future<List<User>> getAllUsers() async {
@@ -628,8 +644,10 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
-    // Trigger automatic push
-    AutoSyncService.instance.pushSingleRecord(table: 'users', recordId: id);
+    // Delete from Google Drive immediately
+    if (result > 0) {
+      await DriveSyncService.instance.deleteUserFromDrive(id);
+    }
     return result;
   }
 
