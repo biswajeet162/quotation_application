@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
+import '../config/oauth_config.dart';
 import 'secure_storage_service.dart';
 import 'desktop_oauth_service.dart';
 
@@ -20,16 +21,11 @@ class GoogleAuthService extends ChangeNotifier {
     'https://www.googleapis.com/auth/drive.file',
   ];
 
-  // TODO: Replace with your OAuth 2.0 Client ID from Google Cloud Console
-  // Get it from: https://console.cloud.google.com/apis/credentials
-  // Application type: Desktop app
-  // 
-  // For now, leaving it empty - google_sign_in will try to use default configuration
-  // If sign-in fails, you MUST add your Client ID here
+  // Use centralized OAuth configuration from OAuthConfig
+  // This ensures all OAuth credentials are managed in one place (lib/config/oauth_config.dart)
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: _scopes,
-    // Uncomment and add your Client ID when you get it from Google Cloud Console:
-    // clientId: 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com',
+    clientId: OAuthConfig.clientId, // Centralized configuration
   );
 
   GoogleSignInAccount? _currentUser;

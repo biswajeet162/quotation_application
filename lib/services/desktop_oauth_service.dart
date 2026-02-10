@@ -170,18 +170,15 @@ class DesktopOAuthService {
       }
 
       // Exchange authorization code for tokens
-        final body = <String, String>{
+      // Always include both client_id and client_secret
+      final body = <String, String>{
         'client_id': OAuthConfig.clientId,
+        'client_secret': OAuthConfig.clientSecret,
         'code': authCode,
         'code_verifier': storedCodeVerifier,
         'redirect_uri': OAuthConfig.redirectUri,
         'grant_type': 'authorization_code',
-        };
-
-        // Add client_secret only if it's configured (some OAuth clients require it)
-        if (OAuthConfig.clientSecret.isNotEmpty) {
-        body['client_secret'] = OAuthConfig.clientSecret;
-        }
+      };
 
         final tokenResponse = await http.post(
         Uri.parse(OAuthConfig.tokenEndpoint),
@@ -333,6 +330,7 @@ class DesktopOAuthService {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: {
           'client_id': OAuthConfig.clientId,
+          'client_secret': OAuthConfig.clientSecret,
           'refresh_token': _refreshToken,
           'grant_type': 'refresh_token',
         },
