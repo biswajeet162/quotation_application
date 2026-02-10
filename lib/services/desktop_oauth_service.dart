@@ -159,23 +159,17 @@ class DesktopOAuthService {
         throw Exception('Authentication timeout. Please try again.');
       }
 
+      // Retrieve code verifier from storage to ensure we use the exact same one
+      final storedCodeVerifier = await _storage.read(key: _codeVerifierKey);
+      if (storedCodeVerifier == null || storedCodeVerifier.isEmpty) {
+        throw Exception('Code verifier not found. Please try signing in again.');
+      }
+
       // Exchange authorization code for tokens
-    //   final tokenResponse = await http.post(
-    //     Uri.parse(OAuthConfig.tokenEndpoint),
-    //     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    //     body: {
-    //       'client_id': OAuthConfig.clientId,
-    //       'code': authCode,
-    //       'code_verifier': codeVerifier,
-    //       'redirect_uri': OAuthConfig.redirectUri,
-    //       'grant_type': 'authorization_code',
-    //     },
-    //   );
-    // Exchange authorization code for tokens
         final body = <String, String>{
         'client_id': OAuthConfig.clientId,
         'code': authCode,
-        'code_verifier': codeVerifier,
+        'code_verifier': storedCodeVerifier,
         'redirect_uri': OAuthConfig.redirectUri,
         'grant_type': 'authorization_code',
         };
@@ -213,6 +207,9 @@ class DesktopOAuthService {
         value: _tokenExpiry!.toIso8601String(),
       );
 
+      // Clean up code verifier after successful token exchange
+      await _storage.delete(key: _codeVerifierKey);
+
       // Clear cache after successful sign-in
       _hasCheckedTokens = true;
       _tokensExist = true;
@@ -220,6 +217,8 @@ class DesktopOAuthService {
 
       return true;
     } catch (e) {
+      // Clean up code verifier on error as well
+      await _storage.delete(key: _codeVerifierKey);
       rethrow;
     }
   }
