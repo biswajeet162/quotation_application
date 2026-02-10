@@ -199,7 +199,10 @@ class DesktopOAuthService {
       _refreshToken = tokenData['refresh_token'] as String?;
       
       final expiresIn = tokenData['expires_in'] as int;
-      _tokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
+      // FOR TESTING: Override expiry to 2 minutes instead of actual expiry time
+      const testExpirySeconds = 120; // 2 minutes
+      _tokenExpiry = DateTime.now().add(Duration(seconds: testExpirySeconds));
+      debugPrint('🧪 [TEST MODE] Token expiry overridden to ${testExpirySeconds}s (2 minutes) for testing (actual: ${expiresIn}s)');
 
       // Store tokens
       await _storage.write(key: _accessTokenKey, value: _accessToken);
@@ -367,8 +370,11 @@ class DesktopOAuthService {
       }
       
       final expiresIn = tokenData['expires_in'] as int;
-      _tokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
-      debugPrint('⏰ [REFRESH TOKEN] Token expiry set: ${_tokenExpiry!.toIso8601String()} (${expiresIn}s from now)');
+      // FOR TESTING: Override expiry to 2 minutes instead of actual expiry time
+      const testExpirySeconds = 120; // 2 minutes
+      _tokenExpiry = DateTime.now().add(Duration(seconds: testExpirySeconds));
+      debugPrint('🧪 [TEST MODE] Token expiry overridden to ${testExpirySeconds}s (2 minutes) for testing (actual: ${expiresIn}s)');
+      debugPrint('⏰ [REFRESH TOKEN] Token expiry set: ${_tokenExpiry!.toIso8601String()} (${testExpirySeconds}s from now)');
 
       debugPrint('💾 [REFRESH TOKEN] Saving tokens to storage...');
       await _storage.write(key: _accessTokenKey, value: _accessToken);
