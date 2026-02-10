@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -28,6 +29,9 @@ class DesktopOAuthService {
   bool _tokensExist = false;
   DateTime? _lastTokenCheck;
   static const _tokenCheckCacheDuration = Duration(seconds: 30);
+  
+  // Periodic token refresh timer
+  Timer? _tokenRefreshTimer;
 
   String? get accessToken => _accessToken;
   bool get isSignedIn => _accessToken != null;
@@ -215,6 +219,9 @@ class DesktopOAuthService {
       _tokensExist = true;
       _lastTokenCheck = DateTime.now();
 
+      // Start periodic token refresh to prevent automatic logout
+      _startPeriodicTokenRefresh();
+
       return true;
     } catch (e) {
       // Clean up code verifier on error as well
@@ -260,13 +267,15 @@ class DesktopOAuthService {
       
       // If token is expired (even by hours/days), refresh it automatically
       if (expiry.isBefore(now)) {
-        debugPrint('Access token expired ${timeSinceExpiry.inHours} hours ago, refreshing...');
+        debugPrint('🚨 [LOAD TOKENS] Access token expired ${timeSinceExpiry.inHours} hours ago, refreshing...');
+        debugPrint('🚨 [LOAD TOKENS] Token expired at: ${expiry.toIso8601String()}');
+        debugPrint('🚨 [LOAD TOKENS] Current time: ${now.toIso8601String()}');
         final refreshed = await refreshToken();
         if (refreshed) {
-          debugPrint('Token refreshed successfully after ${timeSinceExpiry.inHours} hours');
+          debugPrint('✅ [LOAD TOKENS] Token refreshed successfully after ${timeSinceExpiry.inHours} hours');
           return true;
         } else {
-          debugPrint('Failed to refresh token - refresh token may be expired or invalid');
+          debugPrint('❌ [LOAD TOKENS] Failed to refresh token - refresh token may be expired or invalid');
           return false;
         }
       }
@@ -276,9 +285,17 @@ class DesktopOAuthService {
       _accessToken = storedToken;
       _tokenExpiry = expiry;
       
+      final minutesUntilExpiry = expiry.difference(now).inMinutes;
+      final secondsUntilExpiry = expiry.difference(now).inSeconds % 60;
+      
       // Only log when first loading tokens, not on every check
       if (!wasAlreadyLoaded && (forceRefresh || !_hasCheckedTokens)) {
-        debugPrint('Stored token loaded, expires in ${expiry.difference(now).inMinutes} minutes');
+        debugPrint('✅ [LOAD TOKENS] Stored token loaded successfully');
+        debugPrint('⏰ [LOAD TOKENS] Token expires in ${minutesUntilExpiry}m ${secondsUntilExpiry}s');
+        debugPrint('⏰ [LOAD TOKENS] Token expires at: ${expiry.toIso8601String()}');
+        debugPrint('🔄 [LOAD TOKENS] Starting periodic token refresh timer...');
+        // Start periodic token refresh if tokens were just loaded
+        _startPeriodicTokenRefresh();
       }
       _tokensExist = true;
       return true;
@@ -289,16 +306,25 @@ class DesktopOAuthService {
   }
 
   Future<bool> refreshToken() async {
+    debugPrint('🔄 [REFRESH TOKEN] Starting token refresh process...');
     try {
       if (_refreshToken == null) {
+        debugPrint('📥 [REFRESH TOKEN] Loading refresh token from storage...');
         final stored = await _storage.read(key: _refreshTokenKey);
         if (stored == null) {
-          debugPrint('Refresh token not found - user needs to re-authenticate');
+          debugPrint('❌ [REFRESH TOKEN] Refresh token not found - user needs to re-authenticate');
           return false;
         }
         _refreshToken = stored;
+        debugPrint('✅ [REFRESH TOKEN] Refresh token loaded from storage');
+      } else {
+        debugPrint('✅ [REFRESH TOKEN] Refresh token already in memory');
       }
 
+      debugPrint('📤 [REFRESH TOKEN] Sending refresh token request to Google...');
+      debugPrint('📤 [REFRESH TOKEN] Endpoint: ${OAuthConfig.tokenEndpoint}');
+      debugPrint('📤 [REFRESH TOKEN] Client ID: ${OAuthConfig.clientId.substring(0, 20)}...');
+      
       final tokenResponse = await http.post(
         Uri.parse(OAuthConfig.tokenEndpoint),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -309,46 +335,63 @@ class DesktopOAuthService {
         },
       ).timeout(const Duration(seconds: 10));
 
+      debugPrint('📥 [REFRESH TOKEN] Response received: Status ${tokenResponse.statusCode}');
+
       if (tokenResponse.statusCode != 200) {
         final errorBody = tokenResponse.body;
-        debugPrint('Token refresh failed: ${tokenResponse.statusCode} - $errorBody');
+        debugPrint('❌ [REFRESH TOKEN] Token refresh failed: ${tokenResponse.statusCode} - $errorBody');
         
         // If refresh token is invalid/expired, clear stored tokens
         if (tokenResponse.statusCode == 400 || tokenResponse.statusCode == 401) {
-          debugPrint('Refresh token expired or invalid - clearing stored tokens');
+          debugPrint('🚨 [REFRESH TOKEN] Refresh token expired or invalid - clearing stored tokens');
           await signOut();
         }
         return false;
       }
 
+      debugPrint('✅ [REFRESH TOKEN] Parsing token response...');
       final tokenData = jsonDecode(tokenResponse.body) as Map<String, dynamic>;
       _accessToken = tokenData['access_token'] as String;
+      debugPrint('✅ [REFRESH TOKEN] New access token received (length: ${_accessToken!.length})');
       
       // Update refresh token if provided (Google may issue a new one)
       if (tokenData.containsKey('refresh_token')) {
         _refreshToken = tokenData['refresh_token'] as String?;
         if (_refreshToken != null) {
+          debugPrint('🔄 [REFRESH TOKEN] New refresh token received, saving to storage...');
           await _storage.write(key: _refreshTokenKey, value: _refreshToken);
+          debugPrint('✅ [REFRESH TOKEN] New refresh token saved');
         }
+      } else {
+        debugPrint('ℹ️ [REFRESH TOKEN] No new refresh token provided, keeping existing one');
       }
       
       final expiresIn = tokenData['expires_in'] as int;
       _tokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
+      debugPrint('⏰ [REFRESH TOKEN] Token expiry set: ${_tokenExpiry!.toIso8601String()} (${expiresIn}s from now)');
 
+      debugPrint('💾 [REFRESH TOKEN] Saving tokens to storage...');
       await _storage.write(key: _accessTokenKey, value: _accessToken);
       await _storage.write(
         key: _expiryKey,
         value: _tokenExpiry!.toIso8601String(),
       );
+      debugPrint('✅ [REFRESH TOKEN] Tokens saved to storage');
 
-      debugPrint('Token refreshed successfully, expires in ${expiresIn}s');
+      debugPrint('✅ [REFRESH TOKEN] Token refreshed successfully, expires in ${expiresIn}s (${expiresIn ~/ 60} minutes)');
+      
+      // Restart periodic refresh timer after successful refresh
+      debugPrint('🔄 [REFRESH TOKEN] Restarting periodic refresh timer...');
+      _startPeriodicTokenRefresh();
+      
       return true;
     } catch (e) {
-      debugPrint('Token refresh error: $e');
+      debugPrint('❌ [REFRESH TOKEN] Token refresh error: $e');
+      debugPrint('❌ [REFRESH TOKEN] Error type: ${e.runtimeType}');
       // If it's a timeout or network error, don't clear tokens
       // Only clear if it's an authentication error
       if (e.toString().contains('400') || e.toString().contains('401')) {
-        debugPrint('Authentication error during refresh - clearing tokens');
+        debugPrint('🚨 [REFRESH TOKEN] Authentication error during refresh - clearing tokens');
         await signOut();
       }
       return false;
@@ -356,16 +399,22 @@ class DesktopOAuthService {
   }
 
   Future<String?> getValidAccessToken() async {
+    debugPrint('🔍 [GET TOKEN] getValidAccessToken() called');
+    
     if (_accessToken == null || _tokenExpiry == null) {
+      debugPrint('📥 [GET TOKEN] No token in memory, loading from storage...');
       final loaded = await loadStoredTokens(forceRefresh: false);
       if (!loaded) {
         // Only log if we haven't checked recently to avoid flooding
         if (_lastTokenCheck == null || 
             DateTime.now().difference(_lastTokenCheck!) > _tokenCheckCacheDuration) {
-          debugPrint('Failed to load stored tokens');
+          debugPrint('❌ [GET TOKEN] Failed to load stored tokens');
         }
         return null;
       }
+      debugPrint('✅ [GET TOKEN] Tokens loaded from storage');
+    } else {
+      debugPrint('✅ [GET TOKEN] Token already in memory');
     }
 
     // Check if token is expired or about to expire (within 10 minutes)
@@ -374,6 +423,10 @@ class DesktopOAuthService {
     if (_tokenExpiry != null) {
       final now = DateTime.now();
       final timeUntilExpiry = _tokenExpiry!.difference(now);
+      final minutesLeft = timeUntilExpiry.inMinutes;
+      final secondsLeft = timeUntilExpiry.inSeconds % 60;
+      
+      debugPrint('⏰ [GET TOKEN] Token status: ${minutesLeft}m ${secondsLeft}s until expiry');
       
       // Refresh if expired or expiring within 10 minutes (600 seconds)
       // This is approximately 1/6 of the token lifetime, providing a safe buffer
@@ -381,21 +434,28 @@ class DesktopOAuthService {
         // Only log if token is actually expired or very close (within 1 minute)
         // This prevents log spam when checking on every HTTP request
         if (timeUntilExpiry.isNegative || timeUntilExpiry.inSeconds < 60) {
-          debugPrint('Token expired or expiring soon (${timeUntilExpiry.inMinutes} min remaining), refreshing...');
+          debugPrint('🚨 [GET TOKEN] Token expired or expiring soon (${timeUntilExpiry.inMinutes} min remaining), refreshing...');
         }
         final refreshed = await refreshToken();
         if (!refreshed) {
-          debugPrint('Token refresh failed - user needs to re-authenticate');
+          debugPrint('❌ [GET TOKEN] Token refresh failed - user needs to re-authenticate');
           return null;
         }
+        debugPrint('✅ [GET TOKEN] Token refreshed, returning new token');
+      } else {
+        debugPrint('✅ [GET TOKEN] Token still valid, returning existing token');
       }
     }
 
+    debugPrint('✅ [GET TOKEN] Returning access token (length: ${_accessToken?.length ?? 0})');
     return _accessToken;
   }
 
   Future<void> signOut() async {
     try {
+      // Stop periodic token refresh
+      _stopPeriodicTokenRefresh();
+      
       await _storage.delete(key: _accessTokenKey);
       await _storage.delete(key: _refreshTokenKey);
       await _storage.delete(key: _expiryKey);
@@ -409,6 +469,59 @@ class DesktopOAuthService {
       _lastTokenCheck = null;
     } catch (e) {
       // Ignore errors
+    }
+  }
+
+  /// Start periodic token refresh to prevent automatic logout
+  /// Refreshes tokens every 2 minutes (for testing)
+  void _startPeriodicTokenRefresh() {
+    _stopPeriodicTokenRefresh(); // Stop any existing timer
+    
+    debugPrint('🔄 [TOKEN REFRESH] Starting periodic token refresh timer (every 2 minutes)');
+    
+    // Refresh tokens every 2 minutes (for testing)
+    _tokenRefreshTimer = Timer.periodic(const Duration(minutes: 2), (timer) async {
+      debugPrint('⏰ [TOKEN REFRESH] Periodic check triggered at ${DateTime.now().toIso8601String()}');
+      
+      if (_accessToken == null || _tokenExpiry == null) {
+        debugPrint('⚠️ [TOKEN REFRESH] No tokens found - stopping timer');
+        _stopPeriodicTokenRefresh();
+        return;
+      }
+      
+      final now = DateTime.now();
+      final timeUntilExpiry = _tokenExpiry!.difference(now);
+      final minutesLeft = timeUntilExpiry.inMinutes;
+      final secondsLeft = timeUntilExpiry.inSeconds % 60;
+      
+      debugPrint('📊 [TOKEN REFRESH] Token status: ${minutesLeft}m ${secondsLeft}s until expiry');
+      debugPrint('📊 [TOKEN REFRESH] Token expires at: ${_tokenExpiry!.toIso8601String()}');
+      
+      // Only refresh if token is expired or will expire within 30 seconds
+      if (timeUntilExpiry.isNegative || timeUntilExpiry.inSeconds < 30) {
+        debugPrint('🚨 [TOKEN REFRESH] Token expiring soon (${timeUntilExpiry.inSeconds}s remaining), refreshing in 30 sec...');
+        final refreshed = await refreshToken();
+        if (!refreshed) {
+          debugPrint('❌ [TOKEN REFRESH] Periodic token refresh failed - stopping timer');
+          _stopPeriodicTokenRefresh();
+        } else {
+          debugPrint('✅ [TOKEN REFRESH] Periodic token refresh completed successfully');
+        }
+      } else {
+        debugPrint('✅ [TOKEN REFRESH] Token still valid, no refresh needed (${minutesLeft}m ${secondsLeft}s remaining)');
+      }
+    });
+    
+    debugPrint('✅ [TOKEN REFRESH] Started periodic token refresh (every 2 minutes)');
+  }
+
+  /// Stop periodic token refresh
+  void _stopPeriodicTokenRefresh() {
+    if (_tokenRefreshTimer != null) {
+      debugPrint('🛑 [TOKEN REFRESH] Stopping periodic token refresh timer');
+      _tokenRefreshTimer?.cancel();
+      _tokenRefreshTimer = null;
+      debugPrint('✅ [TOKEN REFRESH] Periodic token refresh timer stopped');
     }
   }
 

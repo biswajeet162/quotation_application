@@ -159,6 +159,12 @@ class GoogleAuthService extends ChangeNotifier {
         final result = await DesktopOAuthService.instance.loadStoredTokens();
         if (result) {
           _accessToken = DesktopOAuthService.instance.accessToken;
+          // Sync token expiry from DesktopOAuthService
+          // We need to get it from the stored tokens since DesktopOAuthService doesn't expose it directly
+          final storedExpiry = await _storage.read(key: _expiryKey);
+          if (storedExpiry != null) {
+            _tokenExpiry = DateTime.parse(storedExpiry);
+          }
           notifyListeners(); // Notify listeners when tokens are loaded
         }
         return result;
@@ -229,19 +235,19 @@ class GoogleAuthService extends ChangeNotifier {
 
   Future<String?> getValidAccessToken() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      // Only load tokens if we don't have a valid one
-      if (_accessToken == null || _tokenExpiry == null || _tokenExpiry!.isBefore(DateTime.now())) {
-        // Try to load/refresh tokens
-        final loaded = await DesktopOAuthService.instance.loadStoredTokens();
-        if (!loaded) {
-          return null;
-        }
-      }
+      // Always use DesktopOAuthService's getValidAccessToken which handles refresh automatically
       final token = await DesktopOAuthService.instance.getValidAccessToken();
-      // Sync the token from DesktopOAuthService to this service
-      if (token != null && _accessToken != token) {
-        _accessToken = token;
-        notifyListeners(); // Notify if token was refreshed
+      if (token != null) {
+        // Sync the token and expiry from DesktopOAuthService to this service
+        if (_accessToken != token) {
+          _accessToken = token;
+          // Update expiry from storage
+          final storedExpiry = await _storage.read(key: _expiryKey);
+          if (storedExpiry != null) {
+            _tokenExpiry = DateTime.parse(storedExpiry);
+          }
+          notifyListeners(); // Notify if token was refreshed
+        }
       }
       return token;
     }
